@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<meta charset='utf-8'>
+<title>Web Serial API</title>
+<script class='remove' src='https://www.w3.org/Tools/respec/respec-w3c' async></script>
+<script class='remove' src="respecConfig.js"></script>
+<link rel="stylesheet" href="styles/spec.css">
+
+<div style="background-color: #ddf; border: 1px solid #668; padding:10px 20px">
+  <h1>Web Serial API ( 日本語訳 )</h1><h2> Draft Community Group Report 19 February 2021</h2>
+  <p>この文書は、W3Cの文書 "Web Serial API , Draft Community Group Report 19 February 2021" の日本語訳です。</p>
+
+  <p>Web Serial API の正式な文書は英語版のみであり、日本語訳には翻訳に起因する誤りが含まれている場合があります。
+    英語版の正式な最新の文書は : <b><a href="https://wicg.github.io/serial/">https://wicg.github.io/serial/</a></b>にあります。
+  </p>
+  <p>この翻訳の元となる文書は現在、コミュニティグループのレポート (Draft Community Group Report)であり、今後も更新されて行きます。
+  </p>
+  <p>
+    日本語訳GitHub : <b><a href="https://github.com/g200kg/web-serial-api-ja/">https://github.com/g200kg/web-serial-api-ja/</a></b><br/>
+    日本語訳公開URL : <b><a href="https://g200kg.github.io/web-serial-api-ja/">https://g200kg.github.io/web-serial-api-ja/</a></b>
+  </p>
+  <img src="images/midiappy_small.png" alt="" style="float:left;margin:0px 10px"/>
+  <p>Tatsuya Shinyagaito @ g200kg<br/>
+    誤りその他があれば GitHub 経由などで連絡をお願いいたします。<br/>
+    <b><a href="https://www.g200kg.com/">https://www.g200kg.com/</a></b><br/>
+  </p>
+  <p>2021年2月19日</p>
+</div>
+<hr/>
+
+
+  <section id='abstract'>
+  <cite>Serial API</cite>によって、ウェブサイトがスクリプトを介してシリアルデバイスに接続することができます。このようなAPIは、マイクロコントローラや3Dプリンタなどのシリアルデバイスとドキュメントが通信できるようにすることで、ウェブと物理的な世界の架け橋となるでしょう。
+
+<!--The <cite>Serial API</cite> provides a way for websites to read and write from a
+serial device through script. Such an API would bridge the web and the physical
+world, by allowing documents to communicate with devices such as
+microcontrollers, 3D printers, and other serial devices.-->
+  
+<a
+href="./EXPLAINER.md">手引書</a> も用意されています。
+<!--There is also a companion <a
+href="https://github.com/WICG/serial/blob/gh-pages/EXPLAINER.md">explainer</a>
+document.-->
+</section>
+
+<section id='sotd'>
+  これは作業中のドキュメントです。すべての <a
+  href="https://github.com/WICG/serial">コントリビューション</a> を歓迎します。
+  <!--This is a work in progress. All <a
+  href="https://github.com/WICG/serial">contributions</a> welcome.-->
+</section>
+
+<section data-dfn-for="Navigator">
+  <h2>{{Navigator}} インターフェースの拡張</h2>
+  <!--0<h2>Extensions to the {{Navigator}} interface</h2>-->
+
+  <pre class="idl">
+    [Exposed=Window, SecureContext]
+    partial interface Navigator {
+      [SameObject] readonly attribute Serial serial;
+    };
+  </pre>
+
+  <h3><dfn>serial</dfn> 属性</h3>
+  <!--<h3><dfn>serial</dfn> attribute</h3>-->
+
+  取得時、 {{Navigator/serial}} 属性は常に {{Serial}} オブジェクトの同じインスタンスを返します。
+  <!--When getting, the {{Navigator/serial}} attribute always returns the same
+  instance of the {{Serial}} object.-->
+</section>
+
+<section data-dfn-for="WorkerNavigator">
+  <h2>{{WorkerNavigator}} インターフェースの拡張</h2>
+  <!--<h2>Extensions to the {{WorkerNavigator}} interface</h2>-->
+
+  <pre class="idl">
+    [Exposed=DedicatedWorker, SecureContext]
+    partial interface WorkerNavigator {
+      [SameObject] readonly attribute Serial serial;
+    };
+  </pre>
+
+  <h3><dfn>serial</dfn> 属性</h3>
+  <!--<h3><dfn>serial</dfn> attribute</h3>-->
+
+  取得時、 {{WorkerNavigator/serial}} 属性は常に {{Serial}} オブジェクトの同じインスタンスを返します。
+  <!--When getting, the {{WorkerNavigator/serial}} attribute always returns the same instance of the {{Serial}} object.-->
+</section>
+
+<section data-dfn-for="Serial">
+  <h2>{{Serial}} インターフェース</h2>
+  <!--<h2>{{Serial}} interface</h2>-->
+
+  <pre class="idl">
+    [Exposed=(DedicatedWorker, Window), SecureContext]
+    interface Serial : EventTarget {
+      attribute EventHandler onconnect;
+      attribute EventHandler ondisconnect;
+      Promise&lt;sequence&lt;SerialPort>> getPorts();
+      [Exposed=Window] Promise&lt;SerialPort> requestPort(optional SerialPortRequestOptions options = {});
+    };
+  </pre>
+
+  <section>
+    <h3><dfn>requestPort()</dfn> メソッド</h3>
+    <!--<h3><dfn>requestPort()</dfn> method</h3>-->
+
+    <aside class="example">
+      ユーザーが最初にサイトにアクセスしたとき、シリアルデバイスにアクセスする権限は持っていません。
+      サイトは最初に {{Serial/requestPort()}} を呼び出さなくてはなりません。
+      この呼び出しにより、ブラウザはプロンプトを出し、サイトがどのデバイスを制御をするかの許可をユーザーに求める機会が与えられます。
+      サイトが常に USB 経由で接続されている特定のデバイスで動作するように設計されている場合、サイトは、ユーザーが選択できるデバイスを互換性のあるデバイスのみに制限するフィルターを提供できます。
+      例えば、 Arduino を搭載したロボットをプログラムするサイトでは、次のように指定して選択可能なポートのセットを Arduino の USB ベンダー ID を持つ USB デバイスのみに制限できます。
+
+      <!--When the user first visits a site it will not have permission to access any serial devices. 
+      A site must first call {{Serial/requestPort()}}. 
+      This call gives the browser the opportunity to prompt the user for which device the site should be allowed to control. 
+      If the site is designed to work with a particular device which is always connected via USB the site can provide a filter restricting the devices the user can select to only those that would be compatible. 
+      For example, a site which programs Arduino-powered robots could specify a like the following to limit the set of selectable ports to only USB devices with Arduino's USB vendor ID,-->
+
+      <pre class="js">
+        const filter = { usbVendorId: 0x2341 };
+        const port = await navigator.serial.requestPort({ filters: [filter] });
+      </pre>
+
+      一方、サイトが多種多様なデバイスや USB からシリアル変換器を介して接続されたデバイスでの使用を想定している場合は、フィルタを全く指定せず、ユーザーが適切なデバイスを選択することに頼ることができます。
+      <!--If on the other hand the site expects to be used with a wide variety of
+      devices or devices connected through a USB to serial converter it may
+      specify no filter at all and rely on the user to select the appropriate
+      device,-->
+
+      <pre class="js">
+        const port = await navigator.serial.requestPort();
+      </pre>
+
+      ユーザーにポートを選択させるには、ユーザーにプロンプトを表示させる必要があり、サイトにはユーザーがボタンをクリックする、というような 一時的なアクティブ化([=transient activation=]) を持っていなければなりません。
+      <!--Asking the user to choose a port requires showing a prompt to the user and
+      so the site must have [=transient activation=] from something like the
+      user clicking a button.-->
+
+      <pre class="html">
+        &lt;button id="connect">Connect&lt;/button>
+      </pre>
+
+      <pre class="js">
+        const connectButton = document.getElementById("connect");
+        connectButton.addEventListener('click', () => {
+          try {
+            const port = await navigator.serial.requestPort();
+            // Continue connecting to the device attached to |port|.
+          } catch (e) {
+            // The prompt has been dismissed without selecting a device.
+          }
+        });
+      </pre>
+
+      ユーザーはデバイスを選択しないことを選択できます。その場合、 {{Promise}} は "{{NotFoundError}}" {{DOMException}} でリジェクトされますので、サイトが処理する必要があります。
+      <!--The user may choose not to select a device, in which case the {{Promise}}
+      will be rejected with a "{{NotFoundError}}" {{DOMException}} that the site
+      must handle.-->
+    </aside>
+
+    {{Serial/requestPort()}} メソッドの手順は次のとおりです:
+    <!--The {{Serial/requestPort()}} method steps are:-->
+
+    <ol>
+      <li>|promise:Promise| を 新しい promise ([=a new promise=]) とします。
+      <!--<li>Let |promise:Promise| be [=a new promise=].-->
+      <li>
+        [=this=] が 関連するグローバルオブジェクト([=relevant global object=]) の 関連付けられたドキュメント([=associated Document=]) が `"serial"` という名前の ポリシー制御機能([=policy-controlled feature=]) で 使用を許可([=allowed to use=]) されない場合、 "{{SecurityError}}" {{DOMException}} で |promise| を リジェクト([=reject=]) し、 |promise| を返します。
+        <!--If [=this=]'s [=relevant global object=]'s [=associated Document=] is
+        not [=allowed to use=] the [=policy-controlled feature=] named
+        `"serial"`, [=reject=] |promise| with a "{{SecurityError}}"
+        {{DOMException}} and return |promise|.-->
+      <li>
+        [=this=] の 関連するグローバルオブジェクト([=relevant global object=]) が 一時的なアクティブ化([=transient activation=]) がされていない場合は、 |promise| を "{{SecurityError}}" {{DOMException}}を使用して リジェクト([=reject=]) し、 |promise| を返します。
+        <!--If the [=relevant global object=] of [=this=] does not have [=transient
+        activation=], [=reject=] |promise| with a "{{SecurityError}}"
+        {{DOMException}} and return |promise|.-->
+      <li>
+        もし |options|["{{SerialPortRequestOptions/filters}}"] が存在していれば、|options|["{{SerialPortRequestOptions/filters}}"] 内のそれぞれの |filter:SerialPortFilter| に対して次のステップを実行します :
+        <!--If |options|["{{SerialPortRequestOptions/filters}}"] is present, then
+        for each |filter:SerialPortFilter| in
+        |options|["{{SerialPortRequestOptions/filters}}"] run the following
+        steps:-->
+        <ol>
+          <li>
+            もし |filter|["{{SerialPortFilter/usbVendorId}}"] が存在していない場合、
+            |promise| を {{TypeError}} で リジェクト([=reject=]) し、 |promise| を返します。
+            <!--If |filter|["{{SerialPortFilter/usbVendorId}}"] is not present,
+            [=reject=] |promise| with a {{TypeError}} and return |promise|.-->
+
+            <div class="note">
+              このチェックは、
+              {{SerialPortFilter}} は空には出来ず、
+              {{SerialPortFilter/usbProductId}} が指定されている場合は
+              {{SerialPortFilter/usbVendorId}} も指定しなくてはならない、という複合ルールを実装します。
+              <!--This check implements the combined rule that a
+              {{SerialPortFilter}} cannot be empty and if
+              {{SerialPortFilter/usbProductId}} is specified then
+              {{SerialPortFilter/usbVendorId}} must also be specified.-->
+            </div>
+        </ol>
+      <li>
+        以下の手順を 並列([=in parallel=]) に実行します:
+        <!--Run the following steps [=in parallel=]:-->
+        <ol>
+          <li>
+            |options|["{{SerialPortRequestOptions/filters}}"] が存在する場合、そのフィルターの どれかに一致 ([=match any filter=]) する使用可能なポートのリストを提示し、存在しない場合はすべての使用可能なポートを提示して、サイトがシリアルポートにアクセスする許可を与えるようにユーザーに促します。
+            <!--Prompt the user to grant the site access to a serial port by
+            presenting them with a list of available ports that [=match any
+            filter=] in |options|["{{SerialPortRequestOptions/filters}}"] if
+            present and all available ports otherwise.-->
+          <li>
+            ユーザーがポートを選択しなかった場合は、 [=this=] が 関連するグローバルオブジェクト ([=relevant global object=]) で、 [=シリアルポートタスクソース=] を使用して、グローバルタスクをキューに入れ ([=queue a global task=]) 、 {{"AbortError"}} {{DOMException}} で |promise| を リジェクト ([=reject=]) し、これらの手順を中止します。
+            <!--If the user does not choose a port, [=queue a global task=] on the
+            [=relevant global object=] of [=this=] using the [=serial port task
+            source=] to [=reject=] |promise| with an {{"AbortError"}}
+            {{DOMException}} and abort these steps.-->
+          <li>
+            |port:SerialPort| を、ユーザが選択したポートを表す {{SerialPort}} とします。
+            <!--Let |port:SerialPort| be a {{SerialPort}} representing the port
+            chosen by the user.-->
+          <li>
+            [=シリアルポートタスクソース=] を使用して、 [=this=] に 関連するグローバルオブジェクト ([=relevant global object=]) で グローバルタスクをキューに入れ ([=Queue a global task=]) 、 |port| で |promise| を リゾルブ ([=resolve=]) します。
+            <!--[=Queue a global task=] on the [=relevant global object=] of
+            [=this=] using the [=serial port task source=] to [=resolve=]
+            |promise| with |port|.-->
+        </ol>
+      <li>
+        |promise| を返します。
+        <!--Return |promise|.-->
+    </ol>
+
+    <section data-dfn-for="SerialPortRequestOptions">
+      <h4><dfn>SerialPortRequestOptions</dfn> ディクショナリー</h4>
+      <!--<h4><dfn>SerialPortRequestOptions</dfn> dictionary</h4>-->
+
+      <pre class="idl">
+        dictionary SerialPortRequestOptions {
+          sequence&lt;SerialPortFilter> filters;
+        };
+      </pre>
+
+      <dl>
+        <dt><dfn>filters</dfn> メンバー<!--member-->
+        <dd>
+          シリアルポートに対するフィルター
+          <!--Filters for serial ports-->
+      </dl>
+    </section>
+
+    <section data-dfn-for="SerialPortFilter">
+      <h4><dfn>SerialPortFilter</dfn> ディクショナリー</h4>
+      <!--<h4><dfn>SerialPortFilter</dfn> dictionary</h4>-->
+
+      <pre class="idl">
+        dictionary SerialPortFilter {
+          unsigned short usbVendorId;
+          unsigned short usbProductId;
+        };
+      </pre>
+
+      <dl>
+        <dt><dfn>usbVendorId</dfn> メンバー<!--member-->
+        <dd>
+          USB ベンダー ID
+          <!--USB Vendor ID-->
+        <dt><dfn>usbProductId</dfn> メンバー<!--member-->
+        <dd>
+          USB プロダクト ID
+          <!--USB Product ID-->
+      </dl>
+
+      <p>
+      以下の手順が `true` を返す場合、シリアルポートは |filter:SerialPortFilter| と <dfn data-lt="match the filter">一致</dfn> します:
+      <!--A serial port <dfn data-lt="match the filter">matches the filter</dfn>
+      |filter:SerialPortFilter| if these steps return `true`:-->
+
+      <ol>
+        <li>
+          もし |filter|["{{SerialPortFilter/usbVendorId}}"] が存在しない場合は、 `true` を返します。
+          <!--If |filter|["{{SerialPortFilter/usbVendorId}}"] is not present, return
+          `true`.-->
+        <li>
+          シリアルポートが USB デバイスでない場合は、 `false` を返します。
+          <!--If the serial port is not part of a USB device, return `false`.-->
+        <li>
+          USB デバイスのベンダー ID が |filter|["{{SerialPortFilter/usbVendorId}}"] と等しくない場合は、 `false`を返します。
+          <!--If the USB device's vendor ID is not equal to
+          |filter|["{{SerialPortFilter/usbVendorId}}"], return `false`.-->
+        <li>
+          もし |filter|["{{SerialPortFilter/usbProductId}}"] が存在しない場合は、 `true` を返します。
+          <!--If |filter|["{{SerialPortFilter/usbProductId}}"] is not present, return
+          `true`.-->
+        <li>
+          もし USB デバイスのプロダクトID が |filter|["{{SerialPortFilter/usbProductId}}"] と等しくない場合は、 `false` を返します。
+          <!--If the USB device's product ID is not equal to
+          |filter|["{{SerialPortFilter/usbProductId}}"], return `false`.-->
+        <li>
+          それ以外の場合は `true` を返します。
+          <!--Otherwise, return `true`.-->
+      </ol>
+
+      <p>
+      以下の手順が `true` を返す場合、シリアルポートは {{SerialPortFilter}} のシーケンス内の <dfn data-lt="match any filter">どれかのフィルターと一致</dfn> します:
+      <!--A serial port <dfn data-lt="match any filter">matches any filter</dfn> in
+      a sequence of {{SerialPortFilter}} if these steps return `true`:-->
+
+      <ol>
+        <li>
+          シーケンス内の |filter| ごとに、次のサブステップを実行します:
+          <!--For each |filter| in the sequence, run these sub-steps:-->
+          <ol>
+            <li>
+              もしシリアルポートが |filter| と [=一致=]  でない場合は、 false を返します。
+              <!--If the serial port does not [=match the filter=] |filter|, return false.-->
+          </ol>
+        <li>
+          true を返します。
+          <!--Return true.-->
+    </section>
+  </section>
+
+  <section>
+    <h3><dfn>getPorts()</dfn> メソッド</h3>
+
+    <aside class="example">
+
+      シリアルポートが USB デバイスによって提供されている場合、そのデバイスはシステムに接続されているか、システムから切断されている可能性があります。 サイトがポートにアクセスする権限を取得すると、これらのイベントを受信して、現在アクセスできる接続デバイスのセットを照会できます。
+      <!--If a serial port is provided by a USB device then that device may be
+      connected or disconnected from the system. Once a site has permission to
+      access a port it can receive these events and query for the set of
+      connected devices it currently has access to.-->
+
+      <pre class="js">
+        // Check to see what ports are available when the page loads.
+        document.addEventListener('DOMContentLoaded', async () => {
+          let ports = await navigator.serial.getPorts();
+          // Populate the UI with options for the user to select or
+          // automatically connect to devices.
+        });
+
+        navigator.serial.addEventListener('connect', e => {
+          // Add |e.port| to the UI or automatically connect.
+        });
+
+        navigator.serial.addEventListener('disconnect', e => {
+          // Remove |e.port| from the UI. If the device was open the
+          // disconnection can also be observed as a stream error.
+        });
+      </pre>
+    </aside>
+
+    {{Serial/getPorts()}} メソッドの手順は:
+    <!--The {{Serial/getPorts()}} method steps are:-->
+
+    <ol>
+      <li>
+        |promise:Promise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |promise:Promise| be [=a new promise=].-->
+      <li>
+        [=this=] が 関連するグローバルオブジェクト([=relevant global object=]) の 関連付けられたドキュメント([=associated Document=]) が `"serial"` という名前の ポリシー制御機能([=policy-controlled feature=]) で 使用を許可([=allowed to use=]) されない場合、 "{{SecurityError}}" {{DOMException}} で |promise| を リジェクト([=reject=]) し、 |promise| を返します。
+        <!--If [=this=]'s [=relevant global object=]'s [=associated Document=] is
+        not [=allowed to use=] the [=policy-controlled feature=] named
+        `"serial"`, [=reject=] |promise| with a "{{SecurityError}}"
+        {{DOMException}} and return |promise|.-->
+      <li>
+        以下の手順を 並列 ([=in parallel=]) に実行します:
+        <!--Run the following steps [=in parallel=]:-->
+        <ol>
+          <li>
+            |availablePorts| を {{Serial/requestPort()}} を呼び出した結果である、ユーザーがサイトにアクセスを許可したシステム上の利用可能なシリアルポートのシーケンスとします。
+            <!--Let |availablePorts| be the sequence of available serial ports on
+            the system which the user has allowed the site to access as the
+            result of a previous call to {{Serial/requestPort()}}.-->
+          <li>
+            |ports| を、 |availablePorts| のポートを表す {{SerialPort}} のシーケンスとします。
+            <!--Let |ports| be the sequence of the {{SerialPort}}s representing the
+            ports in |availablePorts|.-->
+          <li>
+            [=シリアルポートタスクソース=] を使用して、 [=this=] に 関連するグローバルオブジェクト ([=relevant global object=]) で グローバルタスクをキューに入れ ([=Queue a global task=])、 |ports| を持って |promise| を リゾルブ ([=resolve=]) します。
+            <!--[=Queue a global task=] on the [=relevant global object=] of
+            [=this=] using the [=serial port task source=] to [=resolve=]
+            |promise| with |ports|.-->
+        </ol>
+      <li>
+        |promise| を返す。
+        <!--Return |promise|.-->
+    </ol>
+  </section>
+
+  <section>
+    <h3><dfn>onconnect</dfn> 属性</h3>
+    <!--<h3><dfn>onconnect</dfn> attribute</h3>-->
+
+    {{Serial/onconnect}} は、<dfn>connect</dfn> イベントの イベントハンドラ IDL 属性 ([=event handler IDL attribute=]) です。
+    <!--{{Serial/onconnect}} is an [=event handler IDL attribute=] for the
+    <dfn>connect</dfn> event type.-->
+  </section>
+
+  <section>
+    <h3><dfn>ondisconnect</dfn> 属性</h3>
+    <!--<h3><dfn>ondisconnect</dfn> attribute</h3>-->
+
+    {{Serial/ondisconnect}} は、<dfn>disconnect</dfn> イベントの イベントハンドラ IDL 属性 ([=event handler IDL attribute=]) です。
+    <!--{{Serial/ondisconnect}} is an [=event handler IDL attribute=] for the
+    <dfn>disconnect</dfn> event type.-->
+  </section>
+</section>
+
+<section data-dfn-for="SerialPort">
+  <h2><dfn>SerialPort</dfn> インターフェース</h2>
+  <!--<h2><dfn>SerialPort</dfn> interface</h2>-->
+
+  <pre class="idl">
+    [Exposed=(DedicatedWorker,Window), SecureContext]
+    interface SerialPort : EventTarget {
+      attribute EventHandler onconnect;
+      attribute EventHandler ondisconnect;
+      readonly attribute ReadableStream readable;
+      readonly attribute WritableStream writable;
+
+      SerialPortInfo getInfo();
+
+      Promise&lt;undefined> open(SerialOptions options);
+      Promise&lt;undefined> setSignals(optional SerialOutputSignals signals = {});
+      Promise&lt;SerialInputSignals> getSignals();
+      Promise&lt;undefined> close();
+    };
+  </pre>
+
+  このインターフェイスのメソッドは通常、非同期で完了し、 <dfn>シリアルポートタスクソース</dfn> 上で作業をキューに入れます。
+  <!--Methods on this interface typically complete asynchronously, queuing work on
+  the <dfn>serial port task source</dfn>.-->
+
+  <p>
+  {{SerialPort}} の [=get the parent=] アルゴリズムは、 {{SerialPort}} の 関連するグローバルオブジェクト ([=relevant global object=]) の {{Navigator}} オブジェクトの {{Navigator/serial}} 取得によって返されるのと同じ {{Serial}} インスタンスを返します。
+  <!--The [=get the parent=] algorithm for {{SerialPort}} returns the same
+  {{Serial}} instance that is returned by the {{SerialPort}}'s [=relevant global
+  object=]'s {{Navigator}} object's {{Navigator/serial}} getter.-->
+
+  <p>
+  {{SerialPort}} のインスタンスは、次の表で説明されている内部スロットと共に作成されます。
+  <!--Instances of {{SerialPort}} are created with the internal slots described in
+  the following table:-->
+
+  <table class="simple" dfn-for=SerialPort dfn-type=attribute>
+    <tr>
+      <th>
+        内部スロット
+        <!--Internal slot-->
+      <th>
+        初期値
+        <!--Initial value-->
+      <th>
+        説明 (非基準)
+        <!--Description (non-normative)-->
+    <tr>
+      <td><dfn>[[\state]]</dfn>
+      <td>`"closed"`
+      <td>
+        {{SerialPort}} のアクティブ状態を追跡します
+        <!--Tracks the active state of the {{SerialPort}}-->
+    <tr>
+      <td><dfn>[[\bufferSize]]</dfn>
+      <td>undefined
+      <td>
+        送信および受信用にバッファリングするデータの量
+        <!--The amount of data to buffer for transmit and receive-->
+    <tr>
+      <td><dfn>[[\readable]]</dfn>
+      <td>`null`
+      <td>
+        ポートからデータを受信する {{ReadableStream}}
+        <!--A {{ReadableStream}} that receives data from the port-->
+    <tr>
+      <td><dfn>[[\readFatal]]
+      <td>`false`
+      <td>
+        ポートで致命的な読み取りエラーが発生したことを示すフラグ
+       <!--A flag indicating that the port has encountered a fatal read error-->
+    <tr>
+      <td><dfn>[[\writable]]</dfn>
+      <td>`null`
+      <td>
+        ポートにデータを送信する {{WritableStream}}
+        <!--A {{WritableStream}} that transmits data to the port-->
+    <tr>
+      <td><dfn>[[\writeFatal]]
+      <td>`false`
+      <td>
+        ポートで致命的な書き込みエラーが発生したことを示すフラグ
+        <!--A flag indicating that the port has encountered a fatal write error-->
+    <tr>
+      <td><dfn>[[\pendingClosePromise]]</dfn>
+      <td>`null`
+      <td>
+        {{SerialPort/readable}} と {{SerialPort/writable}} が close されるのを待つために使用される {{Promise}}
+        <!--A {{Promise}} used to wait for {{SerialPort/readable}} and
+        {{SerialPort/writable}} to close-->
+  </table>
+
+  <section>
+    <h3><dfn>onconnect</dfn> 属性</h3>
+    <!--<h3><dfn>onconnect</dfn> attribute</h3>-->
+
+    {{SerialPort/onconnect}} は、 {{connect}} イベントの イベントハンドラ IDL 属性 ([=event handler IDL attribute=]) です。
+    <!--{{SerialPort/onconnect}} is an [=event handler IDL attribute=] for the
+    {{connect}} event type.-->
+
+    <p>
+    ユーザーが以前に {{Serial/requestPort()}} を呼び出して、サイトがアクセスする事を許可したシステム上のシリアルポートが使用可能になったら、次の手順を実行します:
+    <!--When a serial port becomes available on the system that the user has allowed
+    the site to access as the result of a previous call to
+    {{Serial/requestPort()}}, run the following steps:-->
+
+    <ol>
+      <li>
+        |port:SerialPort| を、ポートを表す {{SerialPort}} とします。
+        <!--Let |port:SerialPort| be a {{SerialPort}} representing the port.-->
+      <li>
+        {{Event/bubbles}} 属性を `true` に初期化して、 |port| で {{connect}} という名前の イベントを発行 ([=Fire an event=]) します。
+        <!--[=Fire an event=] named {{connect}} at |port| with its {{Event/bubbles}}
+        attribute initialized to `true`.-->
+    </ol>
+  </section>
+
+  <section>
+    <h3><dfn>ondisconnect</dfn> 属性</h3>
+    <!--<h3><dfn>ondisconnect</dfn> attribute</h3>-->
+
+    {{SerialPort/ondisconnect}} は、 {{disconnect}} イベントの イベントハンドラ IDL 属性 ([=event handler IDL attribute=]) です。
+    <!--{{SerialPort/ondisconnect}} is an [=event handler IDL attribute=] for the
+    {{disconnect}} event type.-->
+
+    <p>
+      ユーザーが以前に {{Serial/requestPort()}} を呼び出して、サイトがアクセスする事を許可したシステム上のシリアルポートが使用不能になったら、次の手順を実行します:
+      <!--When a serial port becomes unavailable on the system that the user has
+      allowed the site to access as the result of a previous call to
+      {{Serial/requestPort()}}, run the following steps:-->
+
+      <ol>
+        <li>
+          |port:SerialPort| を、ポートを表す {{SerialPort}} とします。
+          <!--Let |port:SerialPort| be a {{SerialPort}} representing the port.-->
+        <li>
+          {{Event/bubbles}} 属性を `true` に初期化して、 |port| で {{disconnect}} という名前の イベントを発行 ([=Fire an event=]) します。
+          <!--[=Fire an event=] named {{disconnect}} at |port| with its
+          {{Event/bubbles}} attribute initialized to `true`.-->
+      </ol>
+  </section>
+
+  <section>
+  <h3><dfn>getInfo()</dfn> メソッド</h3>
+  <!--<h3><dfn>getInfo()</dfn> method</h3>-->
+  {{SerialPort/getInfo()}} メソッドの手順は次のとおりです:
+  <!--The {{SerialPort/getInfo()}} method steps are:-->
+
+  <ol>
+    <li>
+      |info:SerialPortInfo| を 新しい([=new=]) {{SerialPortInfo}} ディクショナリーとします。
+      <!--Let |info:SerialPortInfo| be a [=new=] {{SerialPortInfo}} dictionary.-->
+
+    <li>
+      もしそのポートが USB デバイスならば、次の手順を実行します:
+      <!--If the port is part of a USB device, perform the following steps:-->
+      <ol>
+        <li>
+          |info|["{{SerialPortInfo/usbVendorId}}"] をそのデバイスのベンダー ID に設定します。
+          <!--Set |info|["{{SerialPortInfo/usbVendorId}}"] to the vendor ID of the
+          device.-->
+        <li>
+          |info|["{{SerialPortInfo/usbProductId}}"] をそのデバイスのプロダクト ID に設定します。
+          <!--Set |info|["{{SerialPortInfo/usbProductId}}"] to the product ID of the
+          device.-->
+      </ol>
+    <li>
+      |info| を返します。
+      <!--Return |info|.-->
+  </ol>
+
+  <section data-dfn-for="SerialPortInfo">
+    <h4><dfn>SerialPortInfo</dfn> ディクショナリー</h4>
+    <!--<h4><dfn>SerialPortInfo</dfn> dictionary</h4>-->
+
+    <pre class="idl">
+      dictionary SerialPortInfo {
+        unsigned short usbVendorId;
+        unsigned short usbProductId;
+      };
+    </pre>
+
+    <dl>
+      <dt><dfn>usbVendorId</dfn> メンバー<!--member-->
+      <dd>
+        ポートが USB デバイスの一部である場合、このメンバーはそのデバイスの 16 ビットのベンダー ID になります。 それ以外の場合は `undefined` になります。
+        <!--If the port is part of a USB device this member will be the 16-bit vendor
+        ID of that device. Otherwise it will be `undefined`.-->
+      <dt><dfn>usbProductId</dfn> メンバー<!--member-->
+      <dd>
+        ポートが USB デバイスの一部である場合、このメンバーはそのデバイスの 16 ビットのプロダクト ID になります。 それ以外の場合は `undefined` になります。
+        <!--If the port is part of a USB device this member will be the 16-bit product
+        ID of that device. Otherwise it will be `undefined`.-->
+    </dl>
+  </section>
+
+  </section>
+
+  <section>
+    <h3><dfn>open()</dfn> メソッド</h3>
+    <!--<h3><dfn>open()</dfn> method</h3>-->
+
+    <aside class="example">
+      シリアルポートで通信する前に、そのポートを開く必要があります。 ポートを開く事で、サイトはデータの送受信方法を制御するための必要なパラメーターを指定できます。 開発者は、接続するデバイスのドキュメントで適切なパラメータを確認する必要があります。
+      <!--Before communicating on a serial port it must be opened. Opening the port
+      allows the site to specify the necessary parameters which control how data
+      is transmitted and received. Developers should check the documentation for
+      the device they are connecting to for the appropriate parameters.-->
+
+      <pre class="js">
+        await port.open({ baudRate: /* pick your baud rate */ });
+      </pre>
+
+      {{SerialPort/open()}} が解決されると、 {{SerialPort/readable}} 属性と {{SerialPort/writable}} 属性にアクセス可能になり、接続されたデバイスからデータを受信したり、接続されたデバイスにデータを送信したりするための {{ReadableStream}} と {{WritableStream}} のインスタンスを取得することができます。
+      <!--Once {{SerialPort/open()}} has resolved the {{SerialPort/readable}} and
+      {{SerialPort/writable}} attributes can be accessed to get the
+      {{ReadableStream}} and {{WritableStream}} instances for receiving data
+      from and sending data to the connected device.-->
+    </aside>
+
+    {{SerialPort/open()}} メソッドの手順は次のとおりです:
+    <!--The {{SerialPort/open()}} method steps are:-->
+
+    <ol>
+      <li>
+        |promise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |promise| be [=a new promise=].-->
+      <li>
+        もし [=this=].{{[[state]]}} が "closed" ではない場合、 "{{InvalidStateError}}" {{DOMException}} で |promise| をリジェクトし、 |promise| を返します。
+        <!--If [=this=].{{[[state]]}} is not `"closed"`, reject |promise| with an
+        "{{InvalidStateError}}" {{DOMException}} and return |promise|.-->
+      <li>
+        もし |options|["{{SerialOptions/dataBits}}"] が 7 または 8 ではない場合、 {{TypeError}} で |promise| をリジェクトし、 |promise| を返します。
+        <!--If |options|["{{SerialOptions/dataBits}}"] is not 7 or 8, reject
+        |promise| with {{TypeError}} and return |promise|.-->
+      <li>
+        もし |options|["{{SerialOptions/stopBits}}"] が 1 または 2 ではない場合、 {{TypeError}} で |promise| をリジェクトし、 |promise| を返します。
+        <!--If |options|["{{SerialOptions/stopBits}}"] is not 1 or 2, reject
+        |promise| with {{TypeError}} and return |promise|.-->
+      <li>
+        もし |options|["{{SerialOptions/bufferSize}}"] が 0 の場合、 {{TypeError}} で |promise| をリジェクトし、 |promise| を返します。
+        <!--If |options|["{{SerialOptions/bufferSize}}"] is 0, reject |promise| with
+        {{TypeError}} and return |promise|.-->
+      <li>
+        更に、もし |options|["{{SerialOptions/bufferSize}}"] が実装がサポートする範囲よりも大きい場合、 {{TypeError}} で |promise| をリジェクトし、 |promise| を返します。
+        <!--Optionally, if |options|["{{SerialOptions/bufferSize}}"] is larger than
+        the implementation is able to support, reject |promise| with a
+        {{TypeError}} and return |promise|.-->
+      <li>
+        [=this=].{{[[state]]}} を `"opening"` に設定します。
+        <!--Set [=this=].{{[[state]]}} to `"opening"`.-->
+
+      <li>
+        以下の手順を 並列 ([=in parallel=]) に実行します。
+        <!--Perform the following steps [=in parallel=].-->
+        <ol>
+          <li>
+            |options| で指定された接続パラメータ ( またはそれらのデフォルト値 ) を使用して、オペレーティングシステムを呼び出し、シリアルポートを開きます。
+            <!--Invoke the operating system to open the serial port using the
+            connection parameters (or their defaults) specified in |options|.-->
+          <li>
+            これが何らかの理由で失敗した場合は、 [=シリアルポートタスクソース=] を使用して、 [=this=] が関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=queue a global task=]) 、"{{NetworkError}} {{DOMException}}" で |promise| を リジェクト ([=reject=]) して、これらの手順を中止します。
+            <!--If this fails for any reason, [=queue a global task=] on the
+            [=relevant global object=] of [=this=] using the [=serial port task
+            source=] to [=reject=] |promise| with a "{{NetworkError}}"
+            {{DOMException}} and abort these steps.-->
+          <li>
+            [=this=].{{[[state]]}} を `"opened"` に設定します。
+            <!--Set [=this=].{{[[state]]}} to `"opened"`.-->
+          <li>
+            [=this=].{{[[bufferSize]]}} を |options|["{{SerialOptions/bufferSize}}"] に設定します。
+            <!--Set [=this=].{{[[bufferSize]]}} to
+            |options|["{{SerialOptions/bufferSize}}"].-->
+          <li>
+            |promise| を `undefined` でリゾルブ ([=resolve=]) するために、 [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れます ([=Queue a global task=])。
+            <!--[=Queue a global task=] on the [=relevant global object=] of
+            [=this=] using the [=serial port task source=] to [=resolve=]
+            |promise| with `undefined`.-->
+        </ol>
+      <li>
+        |promise| を返します。
+        <!--Return |promise|.-->
+    </ol>
+
+    <section data-dfn-for="SerialOptions">
+      <h4><dfn>SerialOptions</dfn> ディクショナリー</h4>
+      <!--<h4><dfn>SerialOptions</dfn> dictionary</h4>-->
+
+      <pre class="idl">
+        dictionary SerialOptions {
+          required [EnforceRange] unsigned long baudRate;
+          [EnforceRange] octet dataBits = 8;
+          [EnforceRange] octet stopBits = 1;
+          ParityType parity = "none";
+          [EnforceRange] unsigned long bufferSize = 255;
+          FlowControlType flowControl = "none";
+        };
+      </pre>
+
+      <dl>
+        <dt><dfn>baudRate</dfn> メンバー<!--member-->
+        <dd>
+          シリアル通信を確立するボーレートを示す 0 ではない正の値。
+          <!--A positive, non-zero value indicating the baud rate at which serial
+          communication should be established.-->
+
+          <div class="note">
+            {{SerialOptions/baudRate}} は、このディクショナリーでの唯一の必須メンバーです。 他の接続パラメータには一般的なデフォルト値がありますが、開発者は、接続しようとするデバイスのドキュメントを検討および参照して、正しい値を決定することが重要です。 幾つかの一般的な値はありますが、ボーレートには標準となる値がありません。 この仕様で何らかのデフォルト値を決めてしまうよりもこのパラメータを要求するようにする事で混乱の可能性を下げる事ができます。
+            <!--{{SerialOptions/baudRate}} is the only required member of this
+            dictionary. While there are common default for other connection
+            parameters it is important for developers to consider and consult with
+            the documentation for devices they intend to connect to determine the
+            correct values. While some values are common there is no standard baud
+            rate. Requiring this parameter reduces the potential for confusion if an
+            arbitrary default were chosen by this specification.-->
+
+          </div>
+        <dt><dfn>dataBits</dfn> メンバー<!--member-->
+        <dd>
+          フレームあたりのデータビット数です。 7 または 8 のいずれかになります。
+          <!--The number of data bits per frame. Either 7 or 8.-->
+        <dt><dfn>stopBits</dfn> メンバー<!--member-->
+        <dd>
+          フレームの終わりのストップビットの数です。 1 または 2 のいずれかになります。
+          <!--The number of stop bits at the end of a frame. Either 1 or 2.-->
+        <dt><dfn>parity</dfn> メンバー<!--member-->
+        <dd>
+          パリティモードです。
+          <!--The parity mode.-->
+        <dt><dfn>bufferSize</dfn> メンバー<!--member-->
+        <dd>
+          作成する読み取りおよび書き込みバッファーのサイズを示す 0 ではない正の値です。
+          <!--A positive, non-zero value indicating the size of the read and write
+          buffers that should be created.-->
+        <dt>
+          <dfn>flowControl</dfn> メンバー<!--member-->
+        <dd>
+          フロー制御のモードです。
+          <!--The flow control mode.-->
+      </dl>
+
+      <section data-dfn-for="ParityType">
+        <h5><dfn>ParityType</dfn> 列挙値<!--enum--></h5>
+
+        <pre class="idl">
+          enum ParityType {
+            "none",
+            "even",
+            "odd"
+          };
+        </pre>
+
+        <dl>
+          <dt><dfn>none</dfn>
+          <dd>
+            データワードごとにパリティビットは送信されません。
+            <!--No parity bit is sent for each data word.-->
+          <dt><dfn>even</dfn>
+          <dd>
+            データワードとパリティビットの和は偶数パリティになります。
+            <!--Data word plus parity bit has even parity.-->
+          <dt><dfn>odd</dfn>
+          <dd>
+            データワードとパリティビットの和は奇数パリティになります。
+            <!--Data word plus parity bit has odd parity.-->
+        </dl>
+      </section>
+
+      <section data-dfn-for="FlowControlType">
+        <h5><dfn>FlowControlType</dfn> 列挙値<!--enum--></h5>
+
+        <pre class="idl">
+          enum FlowControlType {
+            "none",
+            "hardware"
+          };
+        </pre>
+
+        <dl>
+          <dt><dfn>none</dfn>
+          <dd>
+            フロー制御は使用しません。
+            <!--No flow control is enabled.-->
+          <dt><dfn>hardware</dfn>
+          <dd>
+            RTS と CTS 信号によるハードウェアフロー制御を使用します。
+            <!--Hardware flow control using the RTS and CTS signals is enabled.-->
+        </dl>
+      </section>
+    </section>
+  </section>
+
+  <section>
+    <h2><dfn>readable</dfn> 属性</h2>
+    <!--<h2><dfn>readable</dfn> attribute</h2>-->
+
+    <aside class="example" id="readable-example">
+      シリアルポートからデータを受信するアプリケーションは、通常、次のような入れ子になったループのペアを使用します:
+      <!--An application receiving data from a serial port will typically use a
+      nested pair of loops like this,-->
+
+      <pre class="js">
+        while (port.readable) {
+          const reader = port.readable.getReader();
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) {
+                // |reader| has been canceled.
+                break;
+              }
+              // Do something with |value|...
+            }
+          } catch (error) {
+            // Handle |error|...
+          } finally {
+            reader.releaseLock();
+          }
+        }
+      </pre>
+      内側のループは、エラーが発生するまでポートからデータのブロックを読み取ります。エラーが発生すると、"catch" ブロックのコードが実行されます。 外側のループは、新しいリーダーを開くことにより、パリティチェックの失敗などの回復可能なエラーを処理します。 致命的なエラーが発生すると、 {{SerialPort/readable}} が `null` になり、ループが終了します。
+      <!--The inner loop will read chunks of data from the port until an error is
+      encountered, at which point the code in the "catch" block will be
+      executed. The outer loop handles recoverable errors such as parity check
+      failures by opening a new reader. Fatal errors will cause
+      {{SerialPort/readable}} to become `null` and the loop to end.-->
+
+      <p>
+      シリアルポートが開いている限り、データを生成し続けることができ、 {{ReadableStreamDefaultReader/read()}} によって返される各ブロックのデータの量は、基本的に呼び出されたタイミングによります。 それが完全なメッセージを構成するかどうかは、デバイスと通信するコード次第です。
+
+      たとえば、デバイスは各メッセージが改行 ( またはシーケンス `"\r\n"` ) で終わるASCII形式のテキストを使用してホストと通信する場合があります。 {{TransformStream}} のパイプラインを使用して、 {{SerialPort/readable}} から供給される {{Uint8Array}} のブロックを、それぞれテキストの行全体を含む {{DOMString}} に自動的に変換できます。
+      <!--As long as the serial port is open it can continue to produce data and the
+      amount of data in each of the chunks returned by
+      {{ReadableStreamDefaultReader/read()}} will be essentially arbitrary based
+      on the timing of when it is called. It is up to the device and the code
+      communicating with it to decide what constitutes a complete message. For
+      example, a device might communicate with the host using ASCII-formatted
+      text where each message ends with a newline (or the sequence `"\r\n"`). A
+      pipeline of {{TransformStream}}s can be used to automatically convert the
+      {{Uint8Array}} chunks provided by {{SerialPort/readable}} into
+      {{DOMString}}s containing an entire line of text each.-->
+
+      <pre class="js">
+        class LineBreakTransformer {
+          constructor() {
+            this.container = '';
+          }
+
+          transform(chunk, controller) {
+            this.container += chunk;
+            const lines = this.container.split('\r\n');
+            this.container = lines.pop();
+            lines.forEach(line => controller.enqueue(line));
+          }
+
+          flush(controller) {
+            controller.enqueue(this.container);
+          }
+        }
+
+        const lineReader = port.readable
+            .pipeThrough(new TextDecoderStream())
+            .pipeThrough(new TransformStream(new LineBreakTransformer()))
+            .getReader();
+      </pre>
+
+      メッセージの境界をエンコードする他の方法としては、各メッセージにその長さを表すプレフィックスを付けたり、次のメッセージを送信する前に定義された長さの時間を待ったりする方法があります。これらのタイプのメッセージの境界のために {{TransformStream}} を実装することは、読者のための演習とします。
+      <!--Some other ways of encoding message boundaries are to prefix each message
+      with its length or to wait a defined length of time before transmitting
+      the next message. Implementing a {{TransformStream}} for these types of
+      message boundaries is left as an exercise for the reader.-->
+    </aside>
+    {{SerialPort/readable}} を取得する際の手順は次のとおりです:
+    <!--The {{SerialPort/readable}} getter steps are:-->
+
+    <ol>
+      <li>
+        もし [=this=].{{[[readable]]}} が　`null` でない場合は [=this=].{{[[readable]]}} を返します。
+        <!--If [=this=].{{[[readable]]}} is not `null`, return
+        [=this=].{{[[readable]]}}.-->
+
+      <li>
+        もし [=this=].{{[[state]]}} が　`"opened"` でない場合は `null` を返します。
+        <!--If [=this=].{{[[state]]}} is not `"opened"`, return `null`.-->
+
+      <li>
+        もし [=this=].{{[[readFatal]]}} が `true` の場合は `null` を返します。
+        <!--If [=this=].{{[[readFatal]]}} is `true`, return `null`.-->
+
+      <li>
+        |stream| を 新しい ([=new=]) {{ReadableStream}} とします。
+        <!--Let |stream| be a [=new=] {{ReadableStream}}.-->
+
+      <li>
+        
+        |pullAlgorithm| を次の手順とします:
+        <!--Let |pullAlgorithm| be the following steps:-->
+        <ol>
+          <li>
+            |desiredSize| を [=this=].{{[[readable]]}} の <a href="https://streams.spec.whatwg.org/#internal-queues">内部キュー</a> の <a href="https://streams.spec.whatwg.org/#desired-size-to-fill-a-streams-internal-queue">desired size</a> とします。
+            <!--Let |desiredSize| be the
+            <a href="https://streams.spec.whatwg.org/#desired-size-to-fill-a-streams-internal-queue">desired size</a>
+            of [=this=].{{[[readable]]}}'s
+            <a href="https://streams.spec.whatwg.org/#internal-queues">internal queue</a>.-->
+          <li>
+            次の手順を 並列 ([=in parallel=]) に実行します:
+            <!--Run the following steps [=in parallel=]:-->
+            <ol>
+              <li>
+                オペレーティングシステムを呼び出して、ポートから最大で |desiredSize| バイトまで読み込み、その結果を バイト列 ([=byte sequence=]) |bytes| に格納します。
+                <!--Invoke the operating system to read up to |desiredSize| bytes
+                from the port, putting the result in the [=byte sequence=]
+                |bytes|.-->
+              <li>
+                [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れて ([=Queue a global task=])、次のステップを実行します:
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to run the
+                following steps:-->
+                <ol>
+                  <li>
+                    エラーが発生しなかった場合は、以下の手順を実行します:
+                    <!--If no errors were encountered run the following steps:-->
+                    <ol>
+                      <li>
+                        |buffer| を |bytes| から作成された 新しい ([=new=]) {{ArrayBuffer}} とします。
+                        <!--Let |buffer| be a [=new=] {{ArrayBuffer}} created from |bytes|.-->
+                      <li>
+                        |chunk| を |buffer| に対する、長さが |bytes| の 新しい ([=new=]) {{Uint8Array}} のビューとします。
+                        <!--Let |chunk| be a [=new=] {{Uint8Array}} view over |buffer|,
+                        who's length is the length of |bytes|.-->
+                      <li>
+                        [=this=].{{[[readable]]}} に対して |chunk| を持って エンキュー ([=ReadableStream/enqueue=]) を呼び出します。
+                        <!--Invoke [=ReadableStream/enqueue=] on
+                        [=this=].{{[[readable]]}} with |chunk|.-->
+                    </ol>
+                  <li>
+                    もしバッファオーバーラン状態になった場合は、 [=this=].{{[[readable]]}} に対して "<code>BufferOverrunError</code>" {{DOMException}} を持って エラー ([=ReadableStream/error=]) を呼び出し、 [=readable ストリームのクローズ=] の手順を呼び出します。
+                    <!--If a buffer overrun condition was encountered, invoke
+                    [=ReadableStream/error=] on [=this=].{{[[readable]]}} with a
+                    "<code>BufferOverrunError</code>" {{DOMException}} and
+                    invoke the steps to [=handle closing the readable stream=].-->
+                  <li>
+                    もしブレーク状態になった場合は、 [=this=].{{[[readable]]}} に対して "<code>BreakError</code>" {{DOMException}} を持って エラー ([=ReadableStream/error=]) を呼び出し、 [=readable ストリームのクローズ=] の手順を呼び出します。
+                    <!--If a break condition was encountered, invoke
+                    [=ReadableStream/error=] on [=this=].{{[[readable]]}} with a
+                    "<code>BreakError</code>" {{DOMException}} and invoke the
+                    steps to [=handle closing the readable stream=].-->
+                  <li>
+                    もしフレーミングエラー状態になった場合は、 [=this=].{{[[readable]]}} に対して "<code>FramingError</code>" {{DOMException}} を持って エラー ([=ReadableStream/error=]) を呼び出し、 [=readable ストリームのクローズ=] の手順を呼び出します。
+                    <!--If a framing error was encountered, invoke
+                    [=ReadableStream/error=] on [=this=].{{[[readable]]}} with a
+                    "<code>FramingError</code>" {{DOMException}} and invoke the
+                    steps to [=handle closing the readable stream=].-->
+                  <li>
+                    もしパリティエラー状態になった場合は、 [=this=].{{[[readable]]}} に対して "<code>ParityError</code>" {{DOMException}} を持って エラー ([=ReadableStream/error=]) を呼び出し、 [=readable ストリームのクローズ=] の手順を呼び出します。
+                    <!--If a parity error was encountered, invoke
+                    [=ReadableStream/error=] on [=this=].{{[[readable]]}} with a
+                    "<code>ParityError</code>" {{DOMException}} and invoke the
+                    steps to [=handle closing the readable stream=].-->
+                  <li>
+                    もしオペレーティングシステムのエラーが発生した場合は、 [=this=].{{[[readable]]}} に対して "{{UnknownError}}" {{DOMException}} を持って エラー ([=ReadableStream/error=]) を呼び出し、 [=readable ストリームのクローズ=] の手順を呼び出します。
+                    <!--If an operating system error was encountered, invoke
+                    [=ReadableStream/error=] on [=this=].{{[[readable]]}} with
+                    an "{{UnknownError}}" {{DOMException}} and invoke the steps
+                    to [=handle closing the readable stream=].-->
+                  <li>
+                    もしポートが切断された場合、次の手順を実行します:
+                    <!--If the port was disconnected, run the following steps:-->
+                    <ol>
+                      <li>
+                        [=this=].{{[[readFatal]]}} を `true` に設定します。
+                        <!--Set [=this=].{{[[readFatal]]}} to `true`,-->
+                      <li>
+                        "{{NetworkError}}" {{DOMException}} を持って [=this=].{{[[readable]]}} 上で [=ReadableStream/error=] を呼び出します。
+                        <!--Invoke [=ReadableStream/error=] on
+                        [=this=].{{[[readable]]}} with a "{{NetworkError}}"
+                        {{DOMException}}.-->
+                      <li>
+                        [=readable ストリームのクローズ=] の手順を呼び出します。
+                        <!--Invoke the steps to [=handle closing the readable
+                        stream=].-->
+                    </ol>
+                </ol>
+            </ol>
+          <li>
+            `undefined` を持って promise をリゾルブ ([=a promise resolved with=]) して返します。
+            <!--Return [=a promise resolved with=] `undefined`.-->
+        </ol>
+
+      <p class="note">
+        このアルゴリズムによって返される {{Promise}} は、ストリームのキャンセルをブロックしないように即座にリゾルブされます。 [[STREAMS]] は、チャンクがエンキューされるまでこのアルゴリズムが再び呼び出されないことを指定します。
+        <!--The {{Promise}} returned by this algorithm is immediately resolved so
+        that it does not block canceling the stream. [[STREAMS]] specifies that
+        this algorithm will not be invoked again until a chunk is enqueued.-->
+      </p>
+
+      <li>
+        |cancelAlgorithm| を次の手順とします:
+        <!--Let |cancelAlgorithm| be the following steps:-->
+        <ol>
+          <li>
+            |promise| を 新しい promise ([=a new promise=]) とします。
+            <!--Let |promise| be [=a new promise=].-->
+          <li>
+            次の手順を 並列 ([=in parallel=]) に実行します。
+            <!--Run the following steps [=in parallel=].-->
+            <ol>
+              <li>
+                オペレーティングシステムを呼び出して、そのポートのすべてのソフトウェアおよびハードウェアの受信バッファの内容を破棄します。
+                <!--Invoke the operating system to discard the contents of all
+                software and hardware receive buffers for the port.-->
+              <li>
+                [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れて ([=Queue a global task=]) 次のステップを実行します。
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to run the
+                following steps:-->
+                <ol>
+                  <li>
+                    [=readable ストリームのクローズ=] 処理を行うためのステップを呼び出します。
+                    <!--Invoke the steps to [=handle closing the readable stream=].-->
+                  <li>
+                    `undefined` を持って |promise| を リゾルブ ([=Resolve=]) します。
+                    <!--[=Resolve=] |promise| with `undefined`.-->
+                </ol>
+            </ol>
+          <li>
+            |promise| を返します。
+            <!--Return |promise|.-->
+        </ol>
+
+      <li>
+        <a href="https://streams.spec.whatwg.org/#readablestream-set-up-pullalgorithm">pullAlgorithm</a> に |pullAlgorithm| 、 <a href="https://streams.spec.whatwg.org/#readablestream-set-up-cancelalgorithm">cancelAlgorithm</a> に |cancelAlgorithm| 、 <a href="https://streams.spec.whatwg.org/#readablestream-set-up-highwatermark">highWaterMark</a> に [=this=].{{[[bufferSize]]}} 、 <a href="https://streams.spec.whatwg.org/#readablestream-set-up-sizealgorithm">sizeAlgorithm</a> に バイトカウントサイズアルゴリズム を設定して |stream| をセットアップ ([=ReadableStream/Set up=])します。
+        <!--[=ReadableStream/Set up=] |stream| with
+        <a href="https://streams.spec.whatwg.org/#readablestream-set-up-pullalgorithm">pullAlgorithm</a>
+        set to |pullAlgorithm|,
+        <a href="https://streams.spec.whatwg.org/#readablestream-set-up-cancelalgorithm">cancelAlgorithm</a>
+        set to |cancelAlgorithm|,
+        <a href="https://streams.spec.whatwg.org/#readablestream-set-up-highwatermark">highWaterMark</a>
+        set to [=this=].{{[[bufferSize]]}}, and
+        <a href="https://streams.spec.whatwg.org/#readablestream-set-up-sizealgorithm">sizeAlgorithm</a>
+        set to a byte-counting size algorithm.-->
+      <li>
+        [=this=].{{[[readable]]}} を |stream| に設定します。
+        <!--Set [=this=].{{[[readable]]}} to |stream|.-->
+      <li>
+        |stream| を返します。
+        <!--Return |stream|.-->
+    </ol>
+
+    <dfn>readable ストリームのクローズ</dfn> 処理を行うには、以下の手順を実行します。
+    <!--To <dfn>handle closing the readable stream</dfn> perform the following-->
+    steps:
+
+    <ol>
+      <li>
+        [=this=].{{[[readable]]}} を `null` に設定します。
+        <!--Set [=this=].{{[[readable]]}} to `null`.-->
+      <li>
+        もし [=this=].{{[[writable]]}} が `null` で、 [=this=].{{[[pendingClosePromise]]}} が `null` でない場合、 [=this=].{{[[pendingClosePromise]]}} を `undefined` でリゾルブ ([=resolve=]) します。
+        <!--If [=this=].{{[[writable]]}} is `null` and
+        [=this=].{{[[pendingClosePromise]]}} is not `null`, [=resolve=]
+        [=this=].{{[[pendingClosePromise]]}} with `undefined`.-->
+    </ol>
+
+  </section>
+
+  <section>
+    <h3><dfn>writable</dfn> 属性</h3>
+    <!--<h3><dfn>writable</dfn> attribute</h3>-->
+
+    <aside class="example">
+      データのブロックをそれぞれポートに書き込むため、必要に応じて {{WritableStreamDefaultWriter}} の作成や解放ができます。 この例では、 {{DOMString}} を送信に必要な {{Uint8Array}} にエンコードするために `TextEncoder` を使用しています。
+      <!--To write individual chunks of data to the port a
+      {{WritableStreamDefaultWriter}} can be created and released as necessary.
+      This example uses a `TextEncoder` to encode a {{DOMString}} as the
+      necessary {{Uint8Array}} for transmission.-->
+
+      <pre class="js">
+        const encoder = new TextEncoder();
+        const writer = port.writable.getWriter();
+        await writer.write(encoder.encode("PING"));
+        writer.releaseLock();
+      </pre>
+
+      より大きなブロックを書き込む場合、アプリケーションによって生成されるデータに対してシリアル送信が遅れ過ぎないように、ポートにバックプレッシャーを摘要することが重要になることがあります。
+      {{WritableStreamDefaultWriter/write()}} メソッドは、データが書き込まれたときに解決する {{Promise}} を返します。送信バッファに利用可能なデータをいくつか持っていることは、良好なスループットを維持するために重要ですが、データのブロックを過剰に生成する前にこの {{Promise}} を待って、過度のバッファリングを避ける事をお勧めします。
+      <!--When writing larger chunks it can be important to allow the port to apply
+      back pressure so that the serial transmitter does not get too far behind
+      sending data generated by the application. The
+      {{WritableStreamDefaultWriter/write()}} method returns a {{Promise}} which
+      resolves when data has been written. While having some data available in
+      the transmit buffer is important to maintain good throughput awaiting this
+      {{Promise}} before generating too many chunks of data is a good practice
+      to avoid excessive buffering.-->
+    </aside>
+
+    {{SerialPort/writable}} を取得する際の手順は次のとおりです:
+    <!--The {{SerialPort/writable}} getter steps are:-->
+
+    <ol>
+      <li>
+        もし [=this=].{{[[writable]]}} が `null` でない場合は [=this=].{{[[writable]]}} を返します。
+        <!--If [=this=].{{[[writable]]}} is not `null`, return
+        [=this=].{{[[writable]]}}.-->
+      <li>
+        もし [=this=].{{[[state]]}} が `"opened"` でない場合は `null` を返します。
+        <!--If [=this=].{{[[state]]}} is not `"opened"`, return `null`.-->
+      <li>
+        もし [=this=].{{[[writeFatal]]}} が `true` であれば `null` を返します。
+        <!--If [=this=].{{[[writeFatal]]}} is `true`, return `null`.-->
+      <li>
+        |stream:WritableStream| を 新しい ([=new=]) {{WritableStream}} とします。
+        <!--Let |stream:WritableStream| be a [=new=] {{WritableStream}}.-->
+      <li>
+        与えられた |chunk| に対して |writeAlgorithm| は次の手順とします:
+        <!--Let |writeAlgorithm| be the following steps, given |chunk|:-->
+        <ol>
+          <li>
+            |promise:Promise| を 新しい promise ([=a new promise=]) とします。
+            <!--Let |promise:Promise| be [=a new promise=].-->
+          <li>
+            もし |chunk| が {{BufferSource}} 型の IDL 値に変換 ([=converted to an IDL value=]) できなければ、 |promise| を {{TypeError}} でリジェクトして返します。 そうでなければ、変換の結果を |source:BufferSource| に保存します。
+            <!--If |chunk| cannot be [=converted to an IDL value=] of type
+            {{BufferSource}}, reject |promise| with a {{TypeError}} and return
+            |promise|. Otherwise, save the result of the conversion in
+            |source:BufferSource|.-->
+          <li>
+            |source| のコピーを取得 ([=Get a copy of the buffer source=]) し、|bytes| に保存します。
+            <!--[=Get a copy of the buffer source=] |source| and save the result in
+            |bytes|.-->
+          <li>
+            並列 ([=In parallel=]) に、次の手順を実行します:
+            <!--[=In parallel=], run the following steps:-->
+            <ol>
+              <li>
+                ポートに |bytes| を書き込むためにオペレーティングシステムを呼び出します。あるいは、後で結合するために chunk を保存します。
+                <!--Invoke the operating system to write |bytes| to the port.
+                Alternately, store the chunk for future coalescing.-->
+
+                <div class="note">
+                  オペレーティングシステムは |bytes| が送信された後ではなく、送信のためにキューに入れられた時点でこの操作から復帰することができます。
+                  <!--The operating system may return from this operation once
+                  |bytes| has been queued for transmission rather than after it
+                  has been transmitted.-->
+                </div>
+              <li>
+                [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=Queue a global task=]) て、次の手順を実行します:
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to run the
+                following steps:-->
+                <ol>
+                  <li>
+                    chunk が正常に書き込まれたか、今後の結合のために保存された場合、 |promise| を `undefined` で リゾルブ ([=resolve=]) します。
+                    <!--If the chunk was successfully written, or was stored for
+                    future coalescing, [=resolve=] |promise| with `undefined`.-->
+
+                    <div class="note">
+                      [[STREAMS]] は、このアルゴリズムの以前の呼び出しによって返された {{Promise}} がリゾルブされた後にのみ |writeAlgorithm| が呼び出されることを指定します。実装は効率化のために、この {{Promise}} を早期にリゾルブし、 {{WritableStream}} の内部キューで待機している複数のチャンクをオペレーティングシステムへの単一のリクエストとして結合しても構いません。
+                      <!--[[STREAMS]] specifies that |writeAlgorithm| will only be
+                      invoked after the {{Promise}} returned by a previous
+                      invocation of this algorithm has resolved. For efficiency
+                      an implementation is allowed to resolve this {{Promise}}
+                      early in order to coalesce multiple chunks waiting in the
+                      {{WritableStream}}'s internal queue into a single request
+                      to the operating system.-->
+                    </div>
+                  <li>
+                    オペレーティングシステムのエラーが発生した場合は "{{UnknownError}}" {{DOMException}} で |promise| をリジェクト ([=reject=]) します。
+                    <!--If an operating system error was encountered, [=reject=]
+                    |promise| with an "{{UnknownError}}" {{DOMException}}.-->
+                  <li>
+                    もしポートが切断された場合、次の手順を実行します:
+                    <!--If the port was disconnected, run the following steps:-->
+                    <ol>
+                      <li>Set [=this=].{{[[writeFatal]]}} to `true`.
+                      <li>
+                        |promise| を "{{NetworkError}}" {{DOMException}} でリジェクト ([=Reject=]) します。
+                        <!--[=Reject=] |promise| with a "{{NetworkError}}"
+                        {{DOMException}}.-->
+                      <li>
+                        [=writable ストリームのクローズ=] を呼び出します。
+                        <!--Invoke the steps to [=handle closing the writable
+                        stream=].-->
+                    </ol>
+                </ol>
+            </ol>
+          <li>
+            |promise| を返します。
+            <!--Return |promise|.-->
+        </ol>
+      <li>
+        |abortAlgorithm| を次の手順とします:
+        <!--Let |abortAlgorithm| be the following steps:-->
+        <ol>
+          <li>
+            |promise| を 新しい promise ([=a new promise=]) とします。
+            <!--Let |promise| be [=a new promise=].-->
+          <li>
+            次の手順を 並列 ([=in parallel=]) に実行します。
+            <!--Run the following steps [=in parallel=].-->
+            <ol>
+              <li>
+                オペレーティングシステムを呼び出して、ポートのすべてのソフトウェアおよびハードウェアの送信バッファの内容を破棄します。
+                <!--Invoke the operating system to discard the contents of all
+                software and hardware transmit buffers for the port.-->
+              <li>
+                [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=Queue a global task=])、 [=シリアルポートタスクソース=]を使用して、以下のステップを実行します:
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to run the
+                following steps:-->
+                <ol>
+                  <li>
+                    [=writable ストリームのクローズ=] の手順を呼び出します。
+                    <!--Invoke the steps to [=handle closing the writable stream=].-->
+                  <li>
+                    |promise| を `undefined` で リゾルブ ([=Resolve=]) します。
+                    <!--[=Resolve=] |promise| with `undefined`.-->
+                </ol>
+            </ol>
+          <li>
+            |promise| を返します。
+            <!--Return |promise|.-->
+        </ol>
+
+        <div class="note">
+          [[STREAMS]] は、以前の |writeAlgorithm| の呼び出しによって返された {{Promise}} ( もしあれば ) がリゾルブした後にのみ |abortAlgorithm| が呼び出されることを指定します。これは、直近の書き込み操作の完了時までアボートをブロックします。これは |WriteAlgorithm| に {{AbortSignal}} を渡すことで修正できます。
+          <!--[[STREAMS]] specifies that |abortAlgorithm| will only be invoked after
+          the {{Promise}} returned by a previous invocation of |writeAlgorithm|
+          (if any) has resolved. This blocks abort on completion of the most
+          recent write operation. This could be fixed by passing an
+          {{AbortSignal}} to |writeAlgorithm|.-->
+
+          <p>
+          この拡張については <a href="https://github.com/whatwg/streams/issues/1015">whatwg/streams#1015</a> で追跡されています。
+          <!--This enhancement is tracked in
+          <a href="https://github.com/whatwg/streams/issues/1015">whatwg/streams#1015</a>.-->
+        </div>
+
+      <li>
+        |closeAlgorithm| を次の手順とします:
+        <!--Let |closeAlgorithm| be the following steps:-->
+        <ol>
+          <li>
+            |promise| を 新しい promise ([=a new promise=])とします。
+            <!--Let |promise| be [=a new promise=].-->
+          <li>
+            次の手順を 並列 ([=in parallel=]) に実行します。
+            <!--Run the following steps [=in parallel=].-->
+            <ol>
+              <li>
+                オペレーティングシステムを呼び出して、ポートのすべてのソフトウェアとハードウェアの送信バッファの内容をフラッシュします。
+                <!--Invoke the operating system to flush the contents of all
+                software and hardware transmit buffers for the port.-->
+              <li>
+                [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=Queue a global task=]) 、以下の手順を実行します:
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to run the
+                following steps:-->
+                <ol>
+                  <li>
+                    [=writable ストリームのクローズ=] の手順を呼び出します。
+                    <!--Invoke the steps to [=handle closing the writable stream=].-->
+                  <li>
+                    `undefined` で |promise| を リゾルブ ([=Resolve=])します。
+                    <!--[=Resolve=] |promise| with `undefined`.-->
+                </ol>
+            </ol>
+          <li>
+            |promise| を返します。
+            <!--Return |promise|.-->
+        </ol>
+
+      <li>
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-writealgorithm">writeAlgorithm</a> に |writeAlgorithm| 、 <a href="https://streams.spec.whatwg.org/#writablestream-set-up-abortalgorithm">abortAlgorithm</a> に |abortAlgorithm| 、<a href="https://streams.spec.whatwg.org/#writablestream-set-up-closealgorithm">closeAlgorithm</a> に |closeAlgorithm| 、 <a href="https://streams.spec.whatwg.org/#writablestream-set-up-highwatermark">highWaterMark</a> に [=this=].{{[[bufferSize]]}} 、 <a href="https://streams.spec.whatwg.org/#writablestream-set-up-sizealgorithm">sizeAlgorithm</a> にバイトカウントサイズアルゴリズムを設定して |stream| をセットアップ ([=WritableStream/Set up=])します。
+        <!--[=WritableStream/Set up=] |stream| with
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-writealgorithm">writeAlgorithm</a>
+        set to |writeAlgorithm|,
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-abortalgorithm">abortAlgorithm</a>
+        set to |abortAlgorithm|,
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-closealgorithm">closeAlgorithm</a>
+        set to |closeAlgorithm|,
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-highwatermark">highWaterMark</a>
+        set to [=this=].{{[[bufferSize]]}}, and
+        <a href="https://streams.spec.whatwg.org/#writablestream-set-up-sizealgorithm">sizeAlgorithm</a>
+        set to a byte-counting size algorithm.-->
+      <li>
+        [=this=].{{[[writable]]}} を |stream| にします。
+        <!--Set [=this=].{{[[writable]]}} to |stream|.-->
+      <li>
+        |stream| を返します。
+        <!--Return |stream|.-->
+    </ol>
+
+    <dfn>writable ストリームのクローズ</dfn> 処理は、以下の手順を実行します:
+    <!--To <dfn>handle closing the writable stream</dfn> perform the following
+    steps:-->
+
+    <ol>
+      <li>
+        [=this=].{{[[writable]]}} を `null` に設定します。
+        <!--Set [=this=].{{[[writable]]}} to `null`.-->
+      <li>
+        もし [=this=].{{[[readable]]}} が `null` で、 [=this=].{{[[pendingClosePromise]]}} が `null` でない場合、 [=this=].{{[[pendingClosePromise]]}} を `undefined` で リゾルブ ([=resolve=]) します。
+        <!--If [=this=].{{[[readable]]}} is `null` and
+        [=this=].{{[[pendingClosePromise]]}} is not `null`, [=resolve=]
+        [=this=].{{[[pendingClosePromise]]}} with `undefined`.-->
+    </ol>
+  </section>
+
+  <section>
+    <h3><dfn>setSignals()</dfn> メソッド</h3>
+    <!--<h3><dfn>setSignals()</dfn> method</h3>-->
+
+    <aside class="example">
+      シリアルポートには、デバイスの検出とフロー制御のための多くの追加の信号が含まれており、これらは明示的に問い合わせたり設定することができます。例えば、幾つかのマイクロコントローラをプログラミングするには、まず、"Data Terminal Ready" ( または DTR ) 信号を反転することにより、 "プログラミング" モードに入る必要があります。
+      <!--Serial ports include a number of additional signals for device detection
+      and flow control which can be queried and set explicitly. As an example,
+      programming some micro-controllers first requires entering a "programming"
+      mode by toggling the "Data Terminal Ready" (or DTR) signal.-->
+
+      <pre class="js">
+        await port.setSignals({ dataTerminalReady: false });
+        await new Promise(resolve => setTimeout(resolve, 200));
+        await port.setSignals({ dataTerminalReady: true });
+      </pre>
+    </aside>
+
+    {{SerialPort/setSignals()}}　メソッドの手順は以下の通りです:
+    <!--The {{SerialPort/setSignals()}} method steps are:-->
+
+    <ol>
+      <li>
+        |promise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |promise| be [=a new promise=].-->
+      <li>
+        もし [=this=].{{[[state]]}} が `"opened"` でなければ |promise| は "{{InvalidStateError}}" {{DOMException}} でリジェクトし |promise| を返します。
+        <!--If [=this=].{{[[state]]}} is not `"opened"`, reject |promise| with an
+        "{{InvalidStateError}}" {{DOMException}} and return |promise|.-->
+      <li>
+        もし |signals| の指定されたメンバーが存在していない場合は |promise| を {{TypeError}} でリジェクトし、 |promise| を返します。
+        <!--If all of the specified members of |signals| are not present reject |promise|
+        with {{TypeError}} and return |promise|.-->
+      <li>
+        以下の手続きを 並列 ([=in parallel=]) に実行します:
+        <!--Perform the following steps [=in parallel=]:-->
+        <ol>
+          <li>
+            もし |signals|["{{SerialOutputSignals/dataTerminalReady}}"] が存在する場合、オペレーティングシステムを呼び出して、シリアルポート上の "data terminal ready" または "DTR" 信号をアサート ( `true` の場合 ) またはデアサート ( `false` の場合 ) します。
+            <!--If |signals|["{{SerialOutputSignals/dataTerminalReady}}"] is
+            present, invoke the operating system to either assert (if `true`) or
+            deassert (if `false`) the "data terminal ready" or "DTR" signal on
+            the serial port.-->
+          <li>
+            もし |signals|["{{SerialOutputSignals/requestToSend}}"] が存在する場合、オペレーティングシステムを呼び出して、シリアルポート上の "request to send" または "RTS" 信号をアサート ( `true` の場合 ) またはデアサート ( `false` の場合 ) します。
+            <!--If |signals|["{{SerialOutputSignals/requestToSend}}"] is present,
+            invoke the operating system to either assert (if `true`) or deassert
+            (if `false`) the "request to send" or "RTS" signal on the serial
+            port.-->
+          <li>
+            もし |signals|["{{SerialOutputSignals/break}}"] が存在する場合、オペレーティングシステムを呼び出して、シリアルポートの "break" 信号をアサート ( `true` の場合 ) またはデアサート ( `false` の場合 ) します。
+            <!--If |signals|["{{SerialOutputSignals/break}}"] is present, invoke the
+            operating system to either assert (if `true`) or deassert (if
+            `false`) the "break" signal on the serial port.-->
+
+            <div class="note">
+              "break" 信号は、典型的には送信ラインを "マーク" 電圧で保持することにより、インバンド信号として実装されますので、それがアサートされたままである間、データ伝送はできません。
+              <!--The "break" signal is typically implemented as an in-band signal
+              by holding the transmit line at the "mark" voltage and thus
+              prevents data transmission for as long as it remains asserted.-->
+            </div>
+          <li>
+            オペレーティングシステムが何らかの理由でこれらの信号の状態変更に失敗した場合、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で [=シリアルポートタスクソース=] を使用して グローバルタスクをキューに入れ ([=queue a global task=]) 、"{{NetworkError}}" {{DOMException}} で |promise| をリジェクトします。
+            <!--If the operating system fails to change the state of any of these
+            signals for any reason, [=queue a global task=] on the [=relevant
+            global object=] of [=this=] using the [=serial port task source=] to
+            reject |promise| with a "{{NetworkError}}" {{DOMException}}.-->
+          <li>
+            |promise| を `undefined` で リゾルブ ([=resolve=]) するために、 [=シリアルポートタスクソース=] を使用して [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れます ([=Queue a global task=])。
+            <!--[=Queue a global task=] on the [=relevant global object=] of
+            [=this=] using the [=serial port task source=] to [=resolve=]
+            |promise| with `undefined`.-->
+        </ol>
+      <li>
+        |promise| を返します。
+        <!--Return |promise|.-->
+    </ol>
+
+    <section data-dfn-for="SerialOutputSignals">
+      <h4><dfn>SerialOutputSignals</dfn> ディクショナリー</h4>
+      <!--<h4><dfn>SerialOutputSignals</dfn> dictionary</h4>-->
+
+      <pre class="idl">
+        dictionary SerialOutputSignals {
+          boolean dataTerminalReady;
+          boolean requestToSend;
+          boolean break;
+        };
+      </pre>
+
+      <dl>
+        <dt><dfn>dataTerminalReady</dfn></dt>
+        <dd>Data Terminal Ready (DTR)</dd>
+        <dt><dfn>requestToSend</dfn></dt>
+        <dd>Request To Send (RTS)</dd>
+        <dt><dfn>break</dfn></dt>
+        <dd>Break</dd>
+      </dl>
+    </section>
+  </section>
+
+  <section>
+    <h3><dfn>getSignals()</dfn> メソッド</h3>
+    <!--<h3><dfn>getSignals()</dfn> method</h3>-->
+
+    {{SerialPort/getSignals()}} メソッドの手順は次の通りです:
+    <!--The {{SerialPort/getSignals()}} method steps are:-->
+
+    <ol>
+      <li>
+        |promise:Promise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |promise:Promise| be [=a new promise=].-->
+      <li>
+        もし [=this=].{{[[state]]}} が `"opened"` でない場合 |promise| を "{{InvalidStateError}}" {{DOMException}} でリジェクトし、 |promise| を返します。
+        <!--If [=this=].{{[[state]]}} is not `"opened"`, reject |promise| with an
+        "{{InvalidStateError}}" {{DOMException}} and return |promise|.-->
+      <li>
+        以下の手順を 並列 ([=in parallel=]) に実行します:
+        <!--Perform the following steps [=in parallel=]:-->
+        <ol>
+          <li>
+            シリアルポートに接続されたデバイスがアサートする可能性のある制御信号の状態をオペレーティングシステムに問い合わせます。
+            <!--Query the operating system for the status of the control signals
+            that may be asserted by the device connected to the serial port.-->
+          <li>
+            もしオペレーティングシステムが何らかの理由でこれらの信号の状態を判断できない場合は、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で [=シリアルポートタスクソース=] を使用して グローバルタスクをキューに入れ ([=queue a global task=])、 |promise| を "{{NetworkError}}" {{DOMException}} でリジェクトして、これらの手順を中止します。
+            <!--If the operating system fails to determine the status of these
+            signals for any reason, [=queue a global task=] on the [=relevant
+            global object=] of [=this=] using the [=serial port task source=] to
+            reject |promise| with a "{{NetworkError}}" {{DOMException}} and
+            abort these steps.-->
+          <li>
+            |signals:SerialInputSignals| を 新しい ([=new=]) {{SerialInputSignals}} とします。
+            <!--Let |signals:SerialInputSignals| be a [=new=]
+            {{SerialInputSignals}}.-->
+          <li>
+            もし "data carrier detect" または ""CTS" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataCarrierDetect}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            <!--Set |signals|["{{SerialInputSignals/dataCarrierDetect}}"] to `true`
+            if the "data carrier detect" or "DCD" signal has been asserted by
+            the device, and `false` otherwise.-->
+          <li>
+            もし "clear to send" または "CTS" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/clearToSend}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            <!--Set |signals|["{{SerialInputSignals/clearToSend}}"] to `true` if the
+            "clear to send" or "CTS" signal has been asserted by the device, and
+            `false` otherwise.-->
+          <li>
+            もし "ring indicator" または "RI" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataCarrierDetect}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            <!--Set |signals|["{{SerialInputSignals/dataCarrierDetect}}"] to `true`
+            if the "ring indicator" or "RI" signal has been asserted by the
+            device, and `false` otherwise.-->
+          <li>
+            もし "data set ready" または "DSR" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataCarrierDetect}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            <!--Set |signals|["{{SerialInputSignals/dataCarrierDetect}}"] to `true`
+            if the "data set ready" or "DSR" signal has been asserted by the
+            device, and `false` otherwise.-->
+          <li>
+            |signals| で |promise| を リゾルブ ([=resolve=]) するために、 [=シリアルポートタスクソース=] を使用して、 [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上の グローバルタスクをキューに入れます ([=Queue a global task=]) 。
+            <!--[=Queue a global task=] on the [=relevant global object=] of
+            [=this=] using the [=serial port task source=] to [=resolve=]
+            |promise| with |signals|.-->
+        </ol>
+      <li>
+        |promise| を返します。
+        <!--Return |promise|.-->
+    </ol>
+
+    <section data-dfn-for="SerialInputSignals">
+    <h4><dfn>SerialInputSignals</dfn> ディクショナリー</h4>
+    <!--<h4><dfn>SerialInputSignals</dfn> dictionary</h4>-->
+
+    <pre class="idl">
+      dictionary SerialInputSignals {
+        required boolean dataCarrierDetect;
+        required boolean clearToSend;
+        required boolean ringIndicator;
+        required boolean dataSetReady;
+      };
+    </pre>
+
+    <dl>
+      <dt><dfn>dataCarrierDetect</dfn> メンバー<!--member--></dt>
+      <dd>Data Carrier Detect (DCD)</dd>
+      <dt><dfn>clearToSend</dfn> メンバー<!--member--></dt>
+      <dd>Clear To Send (CTS)</dd>
+      <dt><dfn>ringIndicator</dfn> メンバー<!--member--></dt>
+      <dd>Ring Indicator (RI)</dd>
+      <dt><dfn>dataSetReady</dfn> メンバー<!--member--></dt>
+      <dd>Data Set Ready (DSR)</dd>
+    </dl>
+    </section>
+  </section>
+
+  <section>
+    <h3><dfn>close()</dfn> メソッド</h3>
+    <!--<h3><dfn>close()</dfn> method</h3>-->
+
+    <aside class="example">
+      ポートとの通信が不要になった場合は、ポートを閉じて関連するリソースをシステムから解放することができます。
+      <!--When communication with the port is no longer required it can be closed
+      and the associated resources released by the system.-->
+
+      <p>
+      `port.`{{SerialPort/close()}} を呼び出すと、バッファリングされたデータをクリアするために、暗黙のうちに `port.`{{SerialPort/readable}}`.`{{ReadableStream/cancel()}} と `port.`{{SerialPort/writable}}`.`{{WritableStream/abort()}} が呼び出されます。アプリケーションが `port.`{{SerialPort/readable}}`.`{{ReadableStream/getReader()}} や `port.`{{SerialPort/writable}}`.`{{WritableStream/getWriter()}} を呼び出した場合、ストリームはロックされ、ポートを閉じることができなくなります。このため、開発者は進行中の読み書き操作をどのように処理するかを決定しなければなりません。 
+      <!--Calling `port.`{{SerialPort/close()}} implicitly invokes
+      `port.`{{SerialPort/readable}}`.`{{ReadableStream/cancel()}} and
+      `port.`{{SerialPort/writable}}`.`{{WritableStream/abort()}} in order to
+      clear any buffered data. If the application has called
+      `port.`{{SerialPort/readable}}`.`{{ReadableStream/getReader()}} or
+      `port.`{{SerialPort/writable}}`.`{{WritableStream/getWriter()}} the stream
+      is locked and the port cannot be closed. This forces the developer to
+      decide how to handle any read or write operations that are in progress.-->
+
+      例えば、ポートが閉じられる前にバッファリングされたデータがすべて送信されたことを確認するには、アプリケーションは `writer.`{{WritableStreamDefaultWriter/close()}} が返す {{Promise}} を待たなければなりません。
+      <!--For example, to ensure that all buffered data has been transmitted before
+      the port is closed the application must await the {{Promise}} returned by
+      `writer.`{{WritableStreamDefaultWriter/close()}}.-->
+
+      <pre class="js">
+        const encoder = new TextEncoder();
+        const writer = port.writable.getWriter();
+        writer.write(encoder.encode("A long message that will take..."));
+        await writer.close();
+        await port.close();
+      </pre>
+
+      未送信のデータを破棄するには、アプリケーションは代わりに `writer.`{{WritableStreamDefaultWriter/abort()}}　を呼び出すことができます。
+      <!--To discard any unsent data the application could instead call
+      `writer.`{{WritableStreamDefaultWriter/abort()}}.-->
+
+      <p>
+      `port`.{{SerialPort/writable}} に {{TransformStream}} がパイプで接続されている場合、`writer.`{{WritableStreamDefaultWriter/close()}} が返す {{Promise}} がリゾルブされるのを待つだけでは不十分です。アプリケーションは、代わりに {{ReadableStream/pipeTo()}} が返す {{Promise}} がリゾルブされるのを待って、パイプチェーンがクローズされるのを待たなければなりません。
+      <!--If a {{TransformStream}} is being piped to `port`.{{SerialPort/writable}}
+      then waiting for the {{Promise}} returned by
+      `writer.`{{WritableStreamDefaultWriter/close()}} to resolve is
+      insufficient. The application must wait for the pipe chain to close by
+      waiting for the {{Promise}} returned by {{ReadableStream/pipeTo()}} to
+      resolve instead.-->
+
+      <pre class="js">
+        const encoder = new TextEncoderStream();
+        const writableStreamClosed = encoder.readable.pipeTo(port.writable);
+        const writer = encoder.writable.getWriter();
+        writer.write("A long message that will take...");
+        writer.close();
+        await writableStreamClosed;
+        await port.close();
+      </pre>
+
+      [[[#readable-example]]] で行ったように、ポートからチャンクを読み込むためにループを使用している場合は、 `port.`{{SerialPort/close()}} を呼び出す前にループを終了しなければなりません。
+      <!--If a loop is being used to read chunks from the port, as is done in
+      [[[#readable-example]]], then it must be exited before calling
+      `port.`{{SerialPort/close()}}.-->
+
+      <pre class="js">
+        let keepReading = true;
+        let reader;
+
+        async function readUntilClosed() {
+          while (port.readable && keepReading) {
+            reader = port.readable.getReader();
+            try {
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                  // |reader| has been canceled.
+                  break;
+                }
+                // Do something with |value|...
+              }
+            } catch (error) {
+              // Handle |error|...
+            } finally {
+              reader.releaseLock();
+            }
+          }
+
+          await port.close();
+        }
+
+        const closed = readUntilClosed();
+
+        // Sometime later...
+        keepReading = false;
+        reader.cancel();
+        await closed;
+      </pre>
+
+      `reader.`{{ReadableStreamGenericReader/cancel()}} を呼び出すと `reader.`{{ReadableStreamDefaultReader/read()}} への呼び出しがすぐに戻り、内側のループを終了して `reader.`{{ReadableStreamDefaultReader/releaseLock()}} を呼び出します。 そしてストリームのロックが解除され、 `keepReading` が `false` に設定されているため、外側のループが終了し、 `port.`{{SerialPort/close()}} が正常に完了します。
+      <!--Calling `reader.`{{ReadableStreamGenericReader/cancel()}} causes the call
+      to `reader.`{{ReadableStreamDefaultReader/read()}} to return immediately,
+      exiting the inner loop and calling
+      `reader.`{{ReadableStreamDefaultReader/releaseLock()}}. The outer loop
+      then exits because `keepReading` has been set to `false` and with the
+      stream unlocked `port.`{{SerialPort/close()}} can complete successfully.-->
+
+      <p>
+      `reader.`{{ReadableStreamGenericReader/cancel()}} が返す {{Promise}} を待った直後に `port.`{{SerialPort/close()}} を呼び出すことも可能ですが、 致命的なエラーが発生して `port.`{{SerialPort/readable}} が `null` になったときにポートが閉じられるように、 `readUntilClosed()` の最後のステップとして `port.`{{SerialPort/close()}} を呼び出すようにする方がより良いです。
+      <!--While it is also possible to call `port.`{{SerialPort/close()}}
+      immediately after awaiting the {{Promise}} returned by
+      `reader.`{{ReadableStreamGenericReader/cancel()}} it is better to place
+      the call to `port.`{{SerialPort/close()}} as the last step of
+      `readUntilClosed()` so that the port is also closed when a fatal error is
+      encountered and `port.`{{SerialPort/readable}} becomes `null`.-->
+    </aside>
+
+    {{SerialPort/close()}} メソッドの手順は次の通りです:
+    <!--The {{SerialPort/close()}} method steps are:-->
+
+    <ol>
+      <li>
+        |promise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |promise| be [=a new promise=].-->
+      <li>
+        |cancelPromise:Promise| を [=this=].{{[[readable]]}} に対して [=ReadableStream/cancel=] を呼び出した結果、または [=this=].{{[[readable]]}} が `null` であれば、 `undefined` で リゾルブされた promise ([=a promise resolved with=]) であるとします。
+        <!--Let |cancelPromise:Promise| be the result of invoking
+        [=ReadableStream/cancel=] on [=this=].{{[[readable]]}} or [=a promise
+        resolved with=] `undefined` if [=this=].{{[[readable]]}} is `null`.-->
+      <li>
+        |abortPromise:Promise| を [=this=].{{[[writable]]}} に対して [=WritableStream/abort=] を呼び出した結果、または [=this=].{{[[writable]]}} が `null` の場合は `undefined` でリゾルブされた promise ([=a promise
+        resolved with=]) であるとします。
+        <!--Let |abortPromise:Promise| be the result of invoking
+        [=WritableStream/abort=] on [=this=].{{[[writable]]}} or [=a promise
+        resolved with=] `undefined` if [=this=].{{[[writable]]}} is `null`.-->
+      <li>
+        |pendingClosePromise| を 新しい promise ([=a new promise=]) とします。
+        <!--Let |pendingClosePromise| be [=a new promise=].-->
+      <li>
+        もし [=this=].{{[[readable]]}} と [=this=].{{[[writable]]}} が `null` であれば [=resolve=] |pendingClosePromise| を `undefined` で リゾルブ ([=resolve=]) します。
+        <!--If [=this=].{{[[readable]]}} and [=this=].{{[[writable]]}} are `null`,
+        [=resolve=] |pendingClosePromise| with `undefined`.-->
+      <li>
+        [=this=].{{[[pendingClosePromise]]}} を |pendingClosePromise| とします。
+        <!--Set [=this=].{{[[pendingClosePromise]]}} to |pendingClosePromise|.-->
+      <li>
+        «|cancelPromise|, |abortPromise|, |pendingClosePromise|» の 全てを待つ promise を取得 ([=getting a promise to wait for all=]) した結果を |combinedPromise| とします。
+        <!--Let |combinedPromise:Promise| be the result of [=getting a promise to
+        wait for all=] with «|cancelPromise|, |abortPromise|,
+        |pendingClosePromise|».-->
+
+      <li>
+        [=this=].{{[[state]]}} を `"closing"` に設定します。
+        <!--Set [=this=].{{[[state]]}} to `"closing"`.-->
+      <li>
+        |combinedPromise| に反応 ([=promise/React=]) します。
+        <!--[=promise/React=] to |combinedPromise|.-->
+        <ul>
+          <li>
+            |combinedPromise| が満たされていた場合:
+            <!--If |combinedPromise| was fulfilled, then:-->
+            <ol>
+              <li>
+                以下の手続きを 並列 ([=in parallel=]) に実行します:
+                <!--Run the following steps [=in parallel=]:-->
+                <ol>
+                  <li>
+                    オペレーティング システムを呼び出してシリアル ポートを閉じ、関連するリソースを解放します。
+                    <!--Invoke the operating system to close the serial port and
+                    release any associated resources.-->
+                  <li>
+                    [=this=].{{[[state]]}} を `"closed"` に設定します。
+                    <!--Set [=this=].{{[[state]]}} to `"closed"`.-->
+                  <li>
+                    [=this=].{{[[readFatal]]}} と [=this=].{{[[writeFatal]]}} を `false` に設定します。
+                    <!--Set [=this=].{{[[readFatal]]}} and
+                    [=this=].{{[[writeFatal]]}} to `false`.-->
+                  <li>
+                    [=this=].{{[[pendingClosePromise]]}} を `null` に設定します。
+                    <!--Set [=this=].{{[[pendingClosePromise]]}} to `null`.-->
+                  <li>
+                    [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=Queue a global task=]) て、 [=シリアルポートタスクソース=] を使って |promise| を `undefined` でリゾルブ ([=resolve=]) します。
+                    <!--[=Queue a global task=] on the [=relevant global object=] of
+                    [=this=] using the [=serial port task source=] to
+                    [=resolve=] |promise| with `undefined`.-->
+                </ol>
+            </ol>
+          <li>
+            もし |combinedPromise| が理由 |r| でリジェクトされた場合:
+            <!--If |combinedPromise| was rejected with reason |r|, then:-->
+            <ol>
+              <li>
+                [=this=].{{[[pendingClosePromise]]}} を `null` に設定します。
+                <!--Set [=this=].{{[[pendingClosePromise]]}} to `null`.-->
+              <li>
+                [=this=] の 関連するグローバルオブジェクト ([=relevant global object=]) 上で グローバルタスクをキューに入れ ([=Queue a global task=]) 、[=シリアルポートタスクソース=] を使って |r| で |promise| を リジェクト ([=reject=]) します。
+                <!--[=Queue a global task=] on the [=relevant global object=] of
+                [=this=] using the [=serial port task source=] to [=reject=]
+                |promise| with |r|.-->
+            </ol>
+        </ul>
+      <li>
+        |promise| を返します。
+        <!--Return |promise|.-->
+    </ol>
+  </section>
+</section>
+
+<section id="security" class="informative">
+  <h2>セキュリティに関する考察</h2>
+  <!--<h2>Security considerations</h2>-->
+
+  このAPIは、 [[?WEB-BLUETOOTH]] および [[?WEBUSB]] と同様のセキュリティリスクをもたらすため、これらの教訓をここに適用できます。 主な脅威は次のとおりです。
+  <!--This API poses similar a security risk to [[?WEB-BLUETOOTH]] and [[?WEBUSB]]
+  and so lessons from those are applicable here. The primary threats are:-->
+
+  <ul>
+    <li>
+    ユーザーをだまして、悪意のある目的でデバイスの意図された機能を使用してデバイスへのアクセスを許可させた悪意のあるサイト。 たとえば、物理的な損傷を引き起こすロボット。
+    <!--A malicious site that has tricked the user into granting it access to a
+    device using the device's intended capabilities for malicious purposes. For
+    example, a robot causing physical damage.-->
+
+    <li>
+    悪意のある目的でデバイスの意図された機能を変更したり、接続されているホストを攻撃したりするために、ユーザーをだましてデバイスに独自のファームウェアをインストールするデバイスへのアクセスを許可させた悪意のあるサイト。 たとえば、デバイスと通信する他のホストソフトウェアでバッファオーバーフローをトリガーします。
+    <!--A malicious site that has tricked the user into granting it access to a
+    device installing its own firmware into the device in order to modify the
+    device's intended capabilities for malicious purposes or to attack the host
+    to which it is connected. For example, triggering a buffer overflow in other
+    host software which communicates with the device.-->
+
+    <li>
+    上記のいずれかを実行するデバイスへのアクセスが許可されている信頼できるサイトに挿入された悪意のあるコード。 たとえば、悪意のあるファームウェアを配信するためにハッキングされているオンラインファームウェアアップデートユーティリティ。
+    <!--Malicious code injected into a trusted site which has been granted access to
+    the device doing any of the above. For example, an online firmware update
+    utility being hacked to deliver malicious firmware.-->
+
+    <li>
+    攻撃者は、悪意のあるデバイスをシステムに接続するようにユーザーを説得します。システムは、悪意のあるサイトまたは悪用されたサイトと衝突して、攻撃者に通信するためのWebベースのチャネルを作成します。
+    <!--An attacker convincing the user to connect a malicious device to their
+    system which colludes with a malicious or exploited site to create a
+    web-based channel for communicating back to the attacker.-->
+  </ul>
+
+  これらすべての攻撃に対する主要な緩和策は、 {{Serial/requestPort()}} パターンであり、これはユーザーの操作を必要とし、一度に単一のデバイスへのアクセスを許可することしかサポートしていません。
+  これは、サイトが脆弱なデバイスが存在するかどうかを判断するために接続されているすべてのデバイスを列挙することができず、代わりにアクセスを希望することを積極的にユーザーに通知する必要があるため、ドライブバイ攻撃を防ぐことができます。
+  実装はまた、サイトが現在デバイスと通信中であることを視覚的に表示し、いつでもその許可を取り消すためのコントロールを提供する事もできます。
+  <!--The primary mitigation to all of these attacks is the {{Serial/requestPort()}}
+  pattern, which requires user interaction and only supports granting access to
+  a single device at a time. This prevents drive-by attacks because a site
+  cannot enumerate all connected devices to determine whether a vulnerable
+  device exists and must instead proactively inform the user that it desires
+  access. Implementations may also provide a visual indication that a site is
+  currently communicating with a device and controls for revoking that
+  permission at any time.-->
+
+  <p>
+  この仕様では、ネットワークベースの攻撃者によって悪意のあるコードが挿入されるのを防ぐために、 [=secure context=] からサイトにサービスを提供する必要があります。 これにより、権限の決定を行うときにユーザーに表示されるサイト ID が正確になります。 この仕様では、クロスオリジン iframe が API を使用できるようにする前に、 [[?PERMISSIONS-POLICY]] を介してオプトインするトップレベルのドキュメントも必要です。  [[?CSP3]] と組み合わせると、これらのメカニズムは悪意のあるコードインジェクション攻撃に対する保護を提供します。
+  <!--This specification requires the site to be served from a [=secure context=] in
+  order to prevent malicious code from being injected by a network-based
+  attacker. This ensures that the site identity shown to the user when making
+  permission decisions is accurate. This specification also requires top-level
+  documents to opt-in through [[?PERMISSIONS-POLICY]] before allowing a
+  cross-origin iframe to use the API. When combined with [[?CSP3]] these
+  mechanisms provide protection against malicious code injection attacks.-->
+
+  <p>
+  残りの懸念は、フィッシング攻撃による接続デバイスの悪用であり、悪意のあるサイトにデバイスへのアクセスを許可するようにユーザーを説得します。 これらの攻撃は、設計どおりにデバイスの機能を悪用するため、またはデバイスに悪意のあるファームウェアをインストールしてホストコンピュータを攻撃するために使用される可能性があります。 ホストソフトウェアは、接続されたデバイスからの入力を不適切に検証するため、攻撃に対して脆弱である可能性があります。 この分野のセキュリティ調査により、ソフトウェアベンダーは、接続されたデバイスを信頼できないものとして扱うようになりました。
+  <!--The remaining concern is the exploitation of a connected device through a
+  phishing attack that convinces the user to grant a malicious site access to a
+  device. These attacks can be used to either exploit the device’s capabilities
+  as designed or to install malicious firmware on the device that will in turn
+  attack the host computer. Host software may be vulnerable to attack because it
+  improperly validates input from connected devices. Security research in this
+  area has encouraged software vendors to treat connected devices as
+  untrustworthy.-->
+
+  <p>
+  ページからデバイスに送信されるデータは不透明なバイトシーケンスであるため、このタイプの攻撃を完全に防止するメカニズムはありません。 特定のタイプのデータの送信をブロックする取り組みは、デバイスメーカーがこのタイプのデータをデバイスに送信したい場合の回避策によって満たされる可能性があります。 
+  <!--There is no mechanism that will completely prevent this type of attack because
+  data sent from a page to the device is an opaque sequence of bytes. Efforts to
+  block a particular type of data from being sent are likely be met by
+  workarounds on the part of device manufacturers who nevertheless want to send
+  this type of data to their devices.-->
+
+  <p>
+  ユーザーエージェントは、デバイスへのアクセスを制御するための追加のメカニズムを実装できます:
+  <!--User agents can implement additional mechanisms to control access to devices:-->
+
+  <ul>
+    <li>
+    明示的な許可リストに追加されない限り、サイトが {{Serial/requestPort()}} を呼び出さないようにする設定。
+    <!--A setting which prevents sites from calling {{Serial/requestPort()}} unless
+    added to an explicit allow list.-->
+
+    <p>
+    システム管理者は、エンタープライズポリシーコントロールを使用して、管理対象のフリート全体にこのような設定を適用できます。 このような制御により、管理者は選択したサイトに特定のデバイスへのアクセスを自動的に許可し、他のデバイスにはアクセスを許可しない場合があります。
+    <!--Systems administrators could apply such a setting across their managed fleet
+    using enterprise policy controls. Such controls may allow the administrator
+    to automatically grant selected sites access to particular devices and no
+    others.-->
+
+    <li>
+    悪用可能であることがわかっているハードウェアのデバイスIDのリストは、ユーザーエージェントを使用して展開できます。 リストされたデバイスへの接続はブロックされます。 実装では、自動更新または実験管理システムを使用して、このリストに更新をオンザフライで展開し、アクティブな攻撃をブロックできます。
+    <!--A list of device IDs for hardware which is known to be exploitable could be
+    deployed with the user agent. Connections to listed devices would be
+    blocked. An implementation could use its automatic update or experiment
+    management system to deploy updates to this list on the fly to block an
+    active attack.-->
+  </ul>
+  [[?WEB-BLUETOOTH]] と [[?WEBUSB]] の実装はこれらの緩和策を実験してきましたが、それらの有効性には限界があります。 まず、デバイスが悪用可能かどうかを定義することは困難です。 たとえば、この API を使用すると、サイトでファームウェアをマイクロコントローラー開発ボードにアップロードできます。 これらのデバイスは教育および愛好家の市場で一般的であるため、これはこのAPIの主要な使用例です。 これらのボードはファームウェアの署名検証を実装していないため、悪意のあるデバイスに簡単に変換される可能性があります。 これらのボードは明らかに悪用可能ですが、ブロックしないでください。
+  <!--Implementations of [[?WEB-BLUETOOTH]] and [[?WEBUSB]] have experimented with
+  these mitigations however there are limits to their effectiveness. First, it
+  is difficult to define whether a device is exploitable. For example, this API
+  will allow a site to upload firmware to a microcontroller development board.
+  This is a key use case for this API as these devices are common in the
+  educational and hobbyist markets. These boards do not implement firmware
+  signature verification and so can easily be turned into a malicious device.
+  These boards are clearly exploitable but should not be blocked.-->
+
+  <p>
+  さらに、脆弱なデバイスのリストを維持することは、 USB と Bluetooth でうまく機能します。これらのプロトコルは、デバイスのメタデータを収集するための帯域外メカニズムを定義しているためです。 したがって、このようなデバイスの製造元とモデルは、仮想シリアルポートとしてホストに提示されている場合でも簡単に識別できます。 ただし、一般的な USB または Bluetooth からシリアルへのアダプタと、 DB-25 、 DE-9 、または RJ-45 コネクタを使用する「実際の」シリアルポートを備えたシステムがあります。 これらの場合、ポートに接続されているデバイスのIDを判別するために読み取ることができるメタデータがないため、これらへのアクセスをブロックすることはできません。
+  <!--In addition, maintaining a list of vulnerable devices works well for USB and
+  Bluetooth because those protocols define out-of-band mechanisms to gather
+  device metadata. The make and model of such devices can thus be easily
+  identified even if they present themselves to the host as a virtual serial
+  ports. However, there are generic USB- or Bluetooth-to-serial adapters as well
+  as systems with "real" serial ports using a DB-25, DE-9 or RJ-45 connector.
+  For these there is no metadata that can be read to determine the identity of
+  the device connected to the port and so blocking access to these is not
+  possible.-->
+</section>
+
+<section id="privacy" class="informative">
+  <h2>プライバシーに関する考察</h2>
+  <!--<h2>Privacy considerations</h2>-->
+
+  シリアルポートとシリアルデバイスには、 2 種類の機密情報が含まれています。 
+  ポートが USB または Bluetooth デバイスの場合、 ( メーカーとモデルを識別する ) ベンダー ID やプロダクト ID などの識別子と、シリアル番号または MAC アドレスがあります。
+  シリアルデバイス自体にも、シリアルポート経由で送信されるコマンドを介して使用できる独自の識別子がある場合があります。
+  デバイスはまた、識別しているいないに関わらず、その他の個人情報を保存する場合もあります。
+  <!--Serial ports and serial devices contain two kinds of sensitive information.
+  When a port is a USB or Bluetooth device there are identifiers such as the
+  vendor and product IDs (which identify the make and model) as well as a serial
+  number or MAC address. The serial device itself may also have its own
+  identifier that is available through commands sent via the serial port. The
+  device may also store other private information which may or may not be
+  identifying.-->
+
+  <p>
+  デバイスの使用許可を管理するために、実装では USB ベンダー ID、プロダクト ID、シリアル番号などのデバイス識別子をユーザー設定ファイルに保存し、ユーザーがサイトからのアクセスを許可したデバイスの安定した識別子として使用することが考えられます。これらはサイトと直接共有されることはなく、許可が取り消されたり、一般的にサイトのデータがクリアされた場合にはクリアされます。
+  <!--In order to manage device permissions an implementation will likely store
+  device identifiers such as the USB vendor ID, product ID and serial number in
+  its user preferences file to be used as stable identifiers for devices the
+  user has granted sites access to. These would not be shared directly with
+  sites and would be cleared when permission is revoked or site data in general
+  is cleared.-->
+
+  <p>
+  ページがアクセスを許可された後、ページからデバイスに送る事ができるコマンドによって、デバイスに保存されている他の機密情報のいずれかにアクセスすることができるかもしれません。この情報へのアクセスをページが防ぐことは、 [[[#security]]] で述べた理由から、現実的ではなく、望ましくありません。
+  <!--Commands a page can send to the device after it has been granted access a page
+  may also be able to access any of the other sensitive information stored by
+  the device. For the reasons mentioned in [[[#security]]] it is impractical and
+  undesirable to attempt to prevent a page from accessing this information.-->
+
+  <p>
+  実装は、サイトからどのデバイスにアクセスを許可し、そして、ユーザーの操作なしにはデバイスへのアクセスを許可しないという完全な制御をユーザーに提供しなくてはなりません。
+  これが {{Serial/requestPort()}} メソッドの意図です。
+  これにより、サイトが黙って列挙し、接続されているすべてのデバイスからデータを収集することを防ぎます。
+  これはファイル選択の UI に似ています。サイトはファイルシステムの知識を持たず、ユーザーが選択したファイルやディレクトリのみを把握します。
+  実装では、サイトがこれらの許可を使用しているときに、タブやアドレスバーに表示されるインジケータアイコンでユーザーに通知することができます。
+  <!--Implementations should provide users with complete control over which devices
+  a site can access and not grant device access without user interaction. This
+  is the intention of the {{Serial/requestPort()}} method. This prevents a site
+  from silently enumerating and collecting data from all connected devices. This
+  is similar to the file picker UI. A site has no knowledge of the filesystem,
+  only the files or directories that have been chosen by the user. An
+  implementation could notify the user when a site is using these permissions
+  with an indicator icon appearing in the tab or address bar.-->
+
+  <p>
+  実装が、 "プライベート" または "インコグニト" ブラウジングモードを提供する場合、ユーザの通常のプロファイルで行われた許可がそのようなセッションに持ち越されないこと、およびこのセッションで与えられた許可がセッションが終了したときに保存されないことを確実にするべきです。
+  実装は、手で識別情報を入力するのと同様に、デバイス識別子および前述のデバイスとの通信から利用可能な他のユニークなプロパティが、セッションをまたいでユーザを識別するために使用される可能性があるため、このようなセッションではデバイスへのアクセスを許可する際にユーザに警告を出す事もあります。
+  <!--Implementations that provide a "private" or "incognito" browsing mode should
+  ensure that permissions from the user's normal profile do not carry over to
+  such a session and permissions granted in this session are not persisted when
+  the session ends. An implementation may warn the user when granting access to
+  a device in such as session as, similar to entering identifying information by
+  hand, device identifiers and other unique properties available from
+  communicating with the device mentioned previously can be used to identify the
+  user between sessions.-->
+
+  <p>
+  デバイスへのアクセスを許可することで Web セキュリティモデルにおける従来の分離境界を破る方法を理解していないと、ユーザーはこの API によって付与される機能に驚くかもしれません。セキュリティ UI やドキュメントでは、サイトがデバイスにアクセスする事を許可することで、サイトがデバイスとその中に含まれるデータを完全に制御できるようになることを説明する必要があります。
+  <!--Users may be surprised by the capabilities granted by this API if they do not
+  understand the ways in which granting access to a device breaks traditional
+  isolation boundaries in the web security model. Security UI and documentation
+  should explain that granting a site access to a device could give the site
+  full control over the device and any data contained within.-->
+</section>
+
+<section id="conformance"></section>
+
+<section class="appendix">
+  <h2>謝辞</h2>
+  <!--<h2>Acknowledgements</h2>-->
+
+  The following people contributed to the development of this document.
+
+  <ul id="gh-contributors"></ul>
+</section>
