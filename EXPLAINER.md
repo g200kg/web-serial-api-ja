@@ -202,35 +202,52 @@ navigator.serial.addEventListener('disconnect', e => {
 In Chrome 89 and above a generic `Event` object is fired at the `SerialPort` interface itself. 
 An event listener can still register an event listener on `navigator.serial` as these events bubble from the `SerialPort` interface to the `Serial` interface. For compatibility with the earlier version the expression "`e.port || e.target`" can be used to get either the `port` attribute (if present) or the `target` attribute (if not).-->
 
-## Security considerations
+## セキュリティに関する考察
 
-This API poses similar a security risk to the Web Bluetooth and WebUSB APIs and so lessons from those are applicable here. The primary threats are:
+このAPIは、 Web Bluetooth および WebUSB API と同様のセキュリティリスクをもたらすため、これらの教訓をここに適用できます。 主な脅威は次のとおりです:
+<!--This API poses similar a security risk to the Web Bluetooth and WebUSB APIs and so lessons from those are applicable here. The primary threats are:-->
 
-* Exploitation of a device’s capabilities by malicious code that has been granted access.
-* Installation of malicious firmware on a device that can be used to attack the host to which it is connected.
-* Malicious code injected into a site which has been granted access doing any of the above.
+* 悪意のあるコードによってアクセスが許可されたデバイスの機能を悪用します。
+* 接続しているホストを攻撃する悪意のあるファームウェアをデバイスにインストールします。
+* 上記のいずれかを実行する悪意のあるコードをサイトに注入します。
+<!--* Exploitation of a device’s capabilities by malicious code that has been granted access.-->
+<!--* Installation of malicious firmware on a device that can be used to attack the host to which it is connected.-->
+<!--* Malicious code injected into a site which has been granted access doing any of the above.-->
 
-The primary mitigation is a permission model that grants access to only a single device at a time. In response to the prompt displayed by a call to `requestDevice()` the user must take active steps to select a particular device. This prevents drive-by attacks against connected devices. Implementations may also give the users a visual indication that a page is currently communicating with a device and controls for revoking that permission at any time.
+基本的な緩和策は、一度にひとつのデバイスのみへのアクセスを許可するパーミッションモデルです。 `requestDevice()` の呼び出しによって表示されるプロンプトに対して、ユーザは特定のデバイスを選択するために能動的に手順を踏まなければなりません。これにより、接続されたデバイスに対するドライブバイ攻撃を防ぐことができます。実装では、ページがデバイスと通信中であることをユーザに視覚的に示し、いつでもその許可を取り消すことができるようにすることもできます。
+<!--The primary mitigation is a permission model that grants access to only a single device at a time. In response to the prompt displayed by a call to `requestDevice()` the user must take active steps to select a particular device. This prevents drive-by attacks against connected devices. Implementations may also give the users a visual indication that a page is currently communicating with a device and controls for revoking that permission at any time.-->
 
-The user agent must also require the page to be served from a secure origin in order to prevent malicious code from being injected by a network-based attacker. Secure delivery of code does not indicate that the code is trustworthy but is a minimum requirement for ensuring that other security decisions being made based on the site's origin are effective. The user agent must also prevent cross-origin iframes from using the API unless explicitly granted permission by the embedding page through [Feature Policy](https://w3c.github.io/webappsec-feature-policy/). This mitigates most malicious code injection attacks unless the trusted site itself is compromised.
+またユーザーエージェントは、ネットワーク経由の攻撃者による悪意のあるコードの注入を防ぐために、ページがセキュアな発信元から提供されることを要求しなければなりません。コードの安全な配信はそのコードが信頼できることを示すものではありませんが、サイトのオリジンに基づいて行われる他のセキュリティ上の判断が意味を持つことを保証するための最低限の要件です。また、ユーザーエージェントは、[Feature Policy](https://w3c.github.io/webappsec-feature-policy/)を通じて埋め込みページから明示的に許可されていない限り、クロスオリジンの iframe が API を使用することを防止しなければなりません。これは、信頼されたサイト自体が侵害されない限り、ほとんどの悪意のあるコードインジェクション攻撃を緩和します。
+<!--The user agent must also require the page to be served from a secure origin in order to prevent malicious code from being injected by a network-based attacker. Secure delivery of code does not indicate that the code is trustworthy but is a minimum requirement for ensuring that other security decisions being made based on the site's origin are effective. The user agent must also prevent cross-origin iframes from using the API unless explicitly granted permission by the embedding page through [Feature Policy](https://w3c.github.io/webappsec-feature-policy/). This mitigates most malicious code injection attacks unless the trusted site itself is compromised.-->
 
-The remaining concern is the exploitation of a connected device through a phishing attack that convinces the user to grant a malicious site access to a device. These attacks exploit the trust that a device typically places in the host computer it is connected to and can be used to either exploit the device’s capabilities as designed or to install malicious firmware on the device that will in turn attack the host computer. There is no mechanism that will completely prevent this type of attack because the meaning of the data sent from a page to the device is opaque to the user agent. Any attempt to block a particular type of data from being sent will be met by workarounds on the part of device manufacturers who nevertheless want to send this type of data to their devices.
+残る懸念は、悪意のあるサイトからデバイスへのアクセスを許可するようにユーザーを誘導するフィッシング攻撃を介して、接続されたデバイスを悪用することです。これらの攻撃は、デバイスが常時接続されているホストコンピュータへの信頼を悪用し、デバイスの本来の機能を悪用したり、デバイスに悪意のあるファームウェアをインストールしてホストコンピュータを攻撃したりするために使用されます。ページからデバイスに送られるデータの意味はユーザーエージェントには不透明なので、このタイプの攻撃を完全に防ぐメカニズムはありません。特定のタイプのデータが送信されるのをブロックしようとする試みは、それでもなおそのタイプのデータを自分のデバイスに送信したいデバイスメーカー側の回避策によって満たされるでしょう。
+<!--The remaining concern is the exploitation of a connected device through a phishing attack that convinces the user to grant a malicious site access to a device. These attacks exploit the trust that a device typically places in the host computer it is connected to and can be used to either exploit the device’s capabilities as designed or to install malicious firmware on the device that will in turn attack the host computer. There is no mechanism that will completely prevent this type of attack because the meaning of the data sent from a page to the device is opaque to the user agent. Any attempt to block a particular type of data from being sent will be met by workarounds on the part of device manufacturers who nevertheless want to send this type of data to their devices.-->
 
-User agents may implement additional settings to mitigate potential phishing attacks:
+ユーザーエージェントは、潜在的なフィッシング攻撃を軽減するために追加で設定を実装することができます。
+<!--User agents may implement additional settings to mitigate potential phishing attacks:-->
 
-* Settings to allow the user to change the default permission setting for this API from “ask” (meaning that the permission prompt is shown) to “block” which prevents the prompt from being displayed entirely.
+* この API のデフォルトのパーミッション設定を "ask"（パーミッションプロンプトが表示されることを意味する）から、プロンプトが完全に表示されないようにする "block" に変更できるようにするための設定
+* システム管理者が組織全体でこのデフォルトを適用できる、エンタープライズポリシーの設定。このデフォルトは、特定の信頼されたオリジンに対して上書きすることができます。
+* [Web Bluetooth](https://github.com/WebBluetoothCG/registries) や [WebUSB](https://github.com/WICG/webusb/blob/master/blocklist.txt) で管理されているような中央集権化されたレジストリで悪用可能である事が知られているハードウェアの USB および Bluetooth デバイス ID のリストを、ベンダーからユーザーエージェントに配布し、これらのデバイスへの接続はブロックされます。
+<!--* Settings to allow the user to change the default permission setting for this API from “ask” (meaning that the permission prompt is shown) to “block” which prevents the prompt from being displayed entirely.
 * Enterprise policy settings so that concerned systems administrators can apply this default throughout their organization. This default could be overridden for particular trusted origins.
-* A list of the USB and Bluetooth device IDs for hardware which is known to be exploitable can be distributed to user agents by the vendor and a centralized registry similar the ones maintained for [Web Bluetooth](https://github.com/WebBluetoothCG/registries) and [WebUSB](https://github.com/WICG/webusb/blob/master/blocklist.txt). Connections to these devices would be blocked.
+* A list of the USB and Bluetooth device IDs for hardware which is known to be exploitable can be distributed to user agents by the vendor and a centralized registry similar the ones maintained for [Web Bluetooth](https://github.com/WebBluetoothCG/registries) and [WebUSB](https://github.com/WICG/webusb/blob/master/blocklist.txt). Connections to these devices would be blocked.-->
 
-This final mitigation is more difficult to apply to this API. There are a number of reasons for this. First, it is difficult to define what “exploitable” means. For example, this API will allow a page to upload firmware to Arduino boards. This is in fact a major use case for this API as these devices are common in the educational and hobbyist markets. These boards do not implement firmware signature verification and so can easily be turned into a malicious device. Should they be blocked? No, Arduino users have to accept this risk.
+この最終的な軽減策は、この API に適用する事がより困難です。これにはいくつかの理由があります。第一に "exploitable" とは何を意味するのかを定義するのが難しいことです。例えば、この API によって Arduino ボードにファームウェアをアップロードするページが可能になります。これらのデバイスは教育市場やホビー市場では一般的であるため、実際にはこの API の主要なユースケースとなっています。これらのボードはファームウェアの署名検証を実装していないため、簡単に悪意のあるデバイスに変えられてしまう可能性があります。これらはブロックされるべきでしょうか？ いいえ、 Arduino ユーザーはこのリスクを受け入れなければなりません。
+<!--This final mitigation is more difficult to apply to this API. There are a number of reasons for this. First, it is difficult to define what “exploitable” means. For example, this API will allow a page to upload firmware to Arduino boards. This is in fact a major use case for this API as these devices are common in the educational and hobbyist markets. These boards do not implement firmware signature verification and so can easily be turned into a malicious device. Should they be blocked? No, Arduino users have to accept this risk.-->
 
-Also, unlike USB and Bluetooth devices, it is difficult to obtain the true identity of a serial device as it may be connected to directly to the host via a a DB-25, DE-9 or RJ-45 connector for which there is no handshake to establish identity, or through a generic USB- or Bluetooth-to-serial adapters.
+また USB や Bluetooth デバイスとは異なり、 DB-25 、 DE-9 、 RJ-45 コネクタを介してホストに直接接続され、ハンドシェイクも行われない場合や、汎用の USB シリアルや Bluetooth シリアルのアダプタを介してホストに接続されている場合もあるため、シリアルデバイスの正体を知ることは困難です。
+<!--Also, unlike USB and Bluetooth devices, it is difficult to obtain the true identity of a serial device as it may be connected to directly to the host via a a DB-25, DE-9 or RJ-45 connector for which there is no handshake to establish identity, or through a generic USB- or Bluetooth-to-serial adapters.-->
 
-## Privacy considerations
+## プライバシーに関する考察
 
-Serial devices contain two kinds of sensitive information,
+シリアルデバイスには 2 種類の機密情報が含まれています。
+<!--Serial devices contain two kinds of sensitive information,-->
 
-1. When the device is a USB or Bluetooth device there are identifiers such as the vendor and product IDs (which identify the make and model) as well as a serial number or MAC address.
-2. Additional identifiers may be available through commands sent via the serial port. The device may also store other private information which may or may not be considered private.
+1. デバイスが USB または Bluetooth デバイスの場合、シリアル番号や MAC アドレスの他にベンダー ID やプロダクト ID ( メーカーやモデルを識別するもの ) などの識別子があります。
+<!--When the device is a USB or Bluetooth device there are identifiers such as the vendor and product IDs (which identify the make and model) as well as a serial number or MAC address.-->
+2. シリアルポートを介して送信されるコマンドによって更に識別子が利用可能であるかも知れません。またデバイスは、プライベートなものとみなされているかいないかに関わらず他の個人情報を保存する場合もあります。
+<!--Additional identifiers may be available through commands sent via the serial port. The device may also store other private information which may or may not be considered private.-->
 
-For the same reasons mentioned in the “Security considerations” section reguarding preventing a device from being programmed with malicious firmware it is impractical to prevent a page from accessing this information once it has been granted access. Instead the permission model gives the user control over exactly which devices a page has access to in the first place. A page cannot proactively enumerate the devices that could be chosen. This is similar to the file picker UI. A site cannot arbitrarily access the filesystem, only the files that have been chosen by the user. Once a file has been selected the site has access to the complete file. The user agent can also notify the user in real time when a page is using these permissions with some kind of indicator.
+悪意のあるファームウェアでデバイスがプログラムされるのを防ぐという "セキュリティに関する考察" のセクションで述べたのと同じ理由から、一度アクセスを許可されたページがこの情報にアクセスするのを防ぐことは非現実的です。その代わりに、パーミッションモデルは、ページが最初の場所でどのデバイスにアクセスできるかを正確に制御することができます。ページは選択可能なデバイスを積極的に列挙することはできません。これはファイル選択の UI に似ています。サイトはファイルシステムに任意にアクセスすることはできません。ファイルが選択されると、サイトは完全なファイルにアクセスすることができます。また、ユーザーエージェントは、あるページがこれらのパーミッションを使用しているときに、何らかのインジケータを使ってリアルタイムでユーザーに通知することができます。
+<!--For the same reasons mentioned in the “Security considerations” section reguarding preventing a device from being programmed with malicious firmware it is impractical to prevent a page from accessing this information once it has been granted access. Instead the permission model gives the user control over exactly which devices a page has access to in the first place. A page cannot proactively enumerate the devices that could be chosen. This is similar to the file picker UI. A site cannot arbitrarily access the filesystem, only the files that have been chosen by the user. Once a file has been selected the site has access to the complete file. The user agent can also notify the user in real time when a page is using these permissions with some kind of indicator.-->
