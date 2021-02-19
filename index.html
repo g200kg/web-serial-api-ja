@@ -1,7 +1,8 @@
 <!DOCTYPE html>
+<html lang="ja">
 <meta charset='utf-8'>
-<title>Web Serial API</title>
-<script class='remove' src='https://www.w3.org/Tools/respec/respec-w3c' async></script>
+<title>Web Serial API ( 日本語訳 )</title>
+<script class='remove' src='./respec.js' async></script>
 <script class='remove' src="respecConfig.js"></script>
 <link rel="stylesheet" href="styles/spec.css">
 
@@ -1467,12 +1468,12 @@ document.-->
             "clear to send" or "CTS" signal has been asserted by the device, and
             `false` otherwise.-->
           <li>
-            もし "ring indicator" または "RI" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataCarrierDetect}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            もし "ring indicator" または "RI" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/ringIndicator}}"] を `true` に設定し、そうでなければ `false` に設定します。
             <!--Set |signals|["{{SerialInputSignals/dataCarrierDetect}}"] to `true`
             if the "ring indicator" or "RI" signal has been asserted by the
             device, and `false` otherwise.-->
           <li>
-            もし "data set ready" または "DSR" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataCarrierDetect}}"] を `true` に設定し、そうでなければ `false` に設定します。
+            もし "data set ready" または "DSR" 信号がデバイスによってアサートされていれば |signals|["{{SerialInputSignals/dataSetReady}}"] を `true` に設定し、そうでなければ `false` に設定します。
             <!--Set |signals|["{{SerialInputSignals/dataCarrierDetect}}"] to `true`
             if the "data set ready" or "DSR" signal has been asserted by the
             device, and `false` otherwise.-->
@@ -1727,13 +1728,14 @@ document.-->
 
   <ul>
     <li>
-    ユーザーをだまして、悪意のある目的でデバイスの意図された機能を使用してデバイスへのアクセスを許可させた悪意のあるサイト。 たとえば、物理的な損傷を引き起こすロボット。
+    悪意のあるコードによって、アクセスが許可されたデバイスの機能を悪用します。
+    たとえば、物理的な損傷を引き起こすロボットです。
     <!--A malicious site that has tricked the user into granting it access to a
     device using the device's intended capabilities for malicious purposes. For
     example, a robot causing physical damage.-->
 
     <li>
-    悪意のある目的でデバイスの意図された機能を変更したり、接続されているホストを攻撃したりするために、ユーザーをだましてデバイスに独自のファームウェアをインストールするデバイスへのアクセスを許可させた悪意のあるサイト。 たとえば、デバイスと通信する他のホストソフトウェアでバッファオーバーフローをトリガーします。
+    悪意のある目的でデバイスの意図された機能を変更したり、接続されているホストを攻撃したりするために、ユーザーをだましてデバイスに独自のファームウェアをインストールするデバイスへのアクセスを許可させた悪意のあるサイト。 たとえば、デバイスと通信する他のホストソフトウェアでバッファオーバーフローを発生させます。
     <!--A malicious site that has tricked the user into granting it access to a
     device installing its own firmware into the device in order to modify the
     device's intended capabilities for malicious purposes or to attack the host
@@ -1741,20 +1743,20 @@ document.-->
     host software which communicates with the device.-->
 
     <li>
-    上記のいずれかを実行するデバイスへのアクセスが許可されている信頼できるサイトに挿入された悪意のあるコード。 たとえば、悪意のあるファームウェアを配信するためにハッキングされているオンラインファームウェアアップデートユーティリティ。
+    上記のいずれかを実行するデバイスへのアクセスが許可されている信頼できるサイトに挿入された悪意のあるコード。 たとえば、悪意のあるファームウェアを配信するためにハッキングされているオンラインのファームウェアアップデートユーティリティです。
     <!--Malicious code injected into a trusted site which has been granted access to
     the device doing any of the above. For example, an online firmware update
     utility being hacked to deliver malicious firmware.-->
 
     <li>
-    攻撃者は、悪意のあるデバイスをシステムに接続するようにユーザーを説得します。システムは、悪意のあるサイトまたは悪用されたサイトと衝突して、攻撃者に通信するためのWebベースのチャネルを作成します。
+    攻撃者は、悪意のあるデバイスをシステムに接続するようにユーザーを誘導します。システムは、悪意のあるサイトまたは悪用されたサイトに協力させられて、攻撃者と通信するための Web ベースの経路を作成します。
     <!--An attacker convincing the user to connect a malicious device to their
     system which colludes with a malicious or exploited site to create a
     web-based channel for communicating back to the attacker.-->
   </ul>
 
   これらすべての攻撃に対する主要な緩和策は、 {{Serial/requestPort()}} パターンであり、これはユーザーの操作を必要とし、一度に単一のデバイスへのアクセスを許可することしかサポートしていません。
-  これは、サイトが脆弱なデバイスが存在するかどうかを判断するために接続されているすべてのデバイスを列挙することができず、代わりにアクセスを希望することを積極的にユーザーに通知する必要があるため、ドライブバイ攻撃を防ぐことができます。
+  これは、サイトが脆弱なデバイスが存在するかどうかを判断するために接続されているすべてのデバイスを列挙することができず、代わりにアクセスを希望することを能動的にユーザーが通知する必要があるため、ドライブバイ攻撃を防ぐことができます。
   実装はまた、サイトが現在デバイスと通信中であることを視覚的に表示し、いつでもその許可を取り消すためのコントロールを提供する事もできます。
   <!--The primary mitigation to all of these attacks is the {{Serial/requestPort()}}
   pattern, which requires user interaction and only supports granting access to
@@ -1776,7 +1778,7 @@ document.-->
   mechanisms provide protection against malicious code injection attacks.-->
 
   <p>
-  残りの懸念は、フィッシング攻撃による接続デバイスの悪用であり、悪意のあるサイトにデバイスへのアクセスを許可するようにユーザーを説得します。 これらの攻撃は、設計どおりにデバイスの機能を悪用するため、またはデバイスに悪意のあるファームウェアをインストールしてホストコンピュータを攻撃するために使用される可能性があります。 ホストソフトウェアは、接続されたデバイスからの入力を不適切に検証するため、攻撃に対して脆弱である可能性があります。 この分野のセキュリティ調査により、ソフトウェアベンダーは、接続されたデバイスを信頼できないものとして扱うようになりました。
+  残りの懸念は、フィッシング攻撃による接続デバイスの悪用であり、悪意のあるサイトにデバイスへのアクセスを許可するようにユーザーを誘導します。 これらの攻撃は、設計どおりにデバイスの機能を悪用する、またはデバイスに悪意のあるファームウェアをインストールしてホストコンピュータを攻撃するために使用される可能性があります。 ホストソフトウェアは、接続されたデバイスからの入力を不適切に検証するため、攻撃に対して脆弱である可能性があります。 この分野のセキュリティの研究により、ソフトウェアベンダーは、接続されたデバイスを信頼できないものとして扱うようになりました。
   <!--The remaining concern is the exploitation of a connected device through a
   phishing attack that convinces the user to grant a malicious site access to a
   device. These attacks can be used to either exploit the device’s capabilities
@@ -1910,7 +1912,9 @@ document.-->
   full control over the device and any data contained within.-->
 </section>
 
-<section id="conformance"></section>
+<section id="conformance">
+  非規範とマークされたセクションと同様に、本仕様書のすべてのオーサリングガイドライン、図、例、および注は非規範です。この仕様書の他のすべての項目は規範的なものです。
+</section>
 
 <section class="appendix">
   <h2>謝辞</h2>
@@ -1920,3 +1924,4 @@ document.-->
 
   <ul id="gh-contributors"></ul>
 </section>
+</html>
