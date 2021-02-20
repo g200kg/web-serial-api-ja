@@ -1,6 +1,6 @@
 # Serial API 手引き書
 
-このドキュメントは、 [Serial API](http://wicg.github.io/serial/) の説明です。これは、Webページがシリアルデバイスと通信できるようにするために提案された仕様です。  
+このドキュメントは、 [Serial API](https://g200kg.github.io/web-serial-api-ja/) の説明です。これは、Webページがシリアルデバイスと通信できるようにするために提案された仕様です。  
 <!--This document is an explainer for the [Serial API](http://wicg.github.io/serial/), a proposed specification for allowing a web page to communicate with a serial device.-->
 
 ## 目的
